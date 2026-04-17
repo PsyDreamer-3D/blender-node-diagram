@@ -1,0 +1,17 @@
+{
+  "name": "blender-node-diagram",
+  "version": "1.0.0",
+  "description": "Gutenberg block for Blender shader node diagrams",
+  "scripts": {
+    "build": "wp-scripts build --webpack-src-dir=src --output-path=build",
+    "start": "wp-scripts start --webpack-src-dir=src --output-path=build",
+    "lint:js": "wp-scripts lint-js",
+    "lint:css": "wp-scripts lint-style"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^30.0.0"
+  },
+  "wp-scripts": {
+    "webpack-config": "./webpack.config.js"
+  }
+}

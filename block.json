@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "blender-node-diagram/diagram",
+  "version": "1.0.0",
+  "title": "Blender Node Diagram",
+  "category": "media",
+  "icon": "share-alt2",
+  "description": "Renders interactive Blender shader node diagrams as scrollable SVGs.",
+  "keywords": [ "blender", "shader", "nodes", "diagram", "NPR" ],
+  "textdomain": "blender-node-diagram",
+  "attributes": {
+    "diagramType": {
+      "type": "string",
+      "default": "blinn",
+      "enum": [ "blinn", "sharp", "group", "custom" ]
+    },
+    "customData": {
+      "type": "string",
+      "default": ""
+    },
+    "label": {
+      "type": "string",
+      "default": ""
+    },
+    "caption": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [ "wide", "full" ],
+    "spacing": {
+      "margin": true,
+      "padding": false
+    }
+  },
+  "editorScript": "file:./build/index.js",
+  "viewScript":   "file:./build/view.js",
+  "style":        "file:./build/frontend.css",
+  "editorStyle":  "file:./build/editor.css"
+}

@@ -1,0 +1,56 @@
+/**
+ * style.css — Loaded on both the editor canvas and the frontend.
+ *
+ * Scoped under .wp-block-blender-node-diagram-diagram to avoid
+ * conflicting with any theme styles.
+ */
+
+.wp-block-blender-node-diagram-diagram {
+	margin-block: 2.25rem;
+}
+
+/* Figure label — small caps above the scroll area */
+.wp-block-blender-node-diagram-diagram .diagram-label {
+	font-family: "JetBrains Mono", "Courier New", monospace;
+	font-size: 0.625rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #6a6660;
+	margin-bottom: 0.5rem;
+}
+
+/* The horizontally scrollable container with the dot-grid background */
+.wp-block-blender-node-diagram-diagram .diagram-scroll {
+	overflow-x: auto;
+	background-color: #0f0f0f;
+	background-image: radial-gradient(circle, #1e1e1e 1px, transparent 1px);
+	background-size: 22px 22px;
+	border: 1px solid #252525;
+	border-radius: 4px;
+	padding: 12px;
+	/* Prevent the SVG from collapsing before view.js runs */
+	min-height: 60px;
+}
+
+/* Caption below the scroll area */
+.wp-block-blender-node-diagram-diagram .diagram-caption {
+	font-family: "JetBrains Mono", "Courier New", monospace;
+	font-size: 0.6875rem;
+	color: #6a6660;
+	margin-top: 0.625rem;
+	text-align: center;
+}
+
+/* Optional scroll hint (used in the original blog post, kept for compatibility) */
+.wp-block-blender-node-diagram-diagram .scroll-hint {
+	font-family: "JetBrains Mono", "Courier New", monospace;
+	font-size: 0.625rem;
+	color: #6a6660;
+	text-align: right;
+	margin-bottom: 0.25rem;
+}
+
+/* Ensure the SVG text inherits nothing unexpected from the theme */
+.wp-block-blender-node-diagram-diagram svg text {
+	font-family: "JetBrains Mono", "Courier New", monospace;
+}

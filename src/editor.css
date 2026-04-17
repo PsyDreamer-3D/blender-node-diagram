@@ -1,0 +1,22 @@
+/**
+ * editor.css — Loaded only inside the block editor.
+ *
+ * Keeps the SVG from overflowing the editor canvas for wide diagrams
+ * (the group diagram is ~2100px wide in diagram-space).
+ */
+
+.wp-block-blender-node-diagram-diagram .diagram-scroll svg {
+	/* Constrain display width inside the editor while preserving scroll */
+	max-width: 100%;
+}
+
+/* Placeholder state before the SVG is populated */
+.wp-block-blender-node-diagram-diagram .diagram-scroll:empty::after,
+.wp-block-blender-node-diagram-diagram .diagram-scroll svg:not([viewBox])::before {
+	content: "Rendering diagram…";
+	display: block;
+	padding: 1rem;
+	font-family: "JetBrains Mono", monospace;
+	font-size: 0.75rem;
+	color: #6a6660;
+}

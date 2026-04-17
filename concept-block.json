@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "blender-node-diagram/concept",
+  "version": "1.0.0",
+  "title": "Blinn-Phong Vector Diagram",
+  "category": "media",
+  "icon": "share-alt2",
+  "description": "Static illustration of the N, L, V, H vector geometry at a Blinn-Phong shading point. No scripting required — the SVG is saved directly into the post HTML.",
+  "keywords": [ "blender", "NPR", "shader", "vectors", "diagram" ],
+  "textdomain": "blender-node-diagram",
+  "attributes": {
+    "caption": {
+      "type": "string",
+      "default": "The half-vector H bisects L and V. When H aligns with N (θ = 0), the highlight is at peak brightness."
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [ "wide" ]
+  },
+  "editorScript": "file:./build/index.js",
+  "style":        "file:./build/frontend.css",
+  "editorStyle":  "file:./build/editor.css"
+}
