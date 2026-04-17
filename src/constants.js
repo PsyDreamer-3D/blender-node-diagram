@@ -14,6 +14,8 @@ export const NODE_TYPES = [
 	{ label: 'Output',       value: 'output'     },
 	{ label: 'Group Input',  value: 'groupIn'    },
 	{ label: 'Group Output', value: 'groupOut'   },
+	{ label: 'Color Ramp',   value: 'colorRamp'  },
+	{ label: 'Mix Color',    value: 'mixColor'   },
 ];
 
 export const SOCKET_TYPES = [
@@ -23,7 +25,7 @@ export const SOCKET_TYPES = [
 	{ label: 'Color',  value: 'color'  },
 ];
 
-/** Header colour for each node type (matches the renderer palette). */
+/** Header colour for each node type (used by the diagram builder type badge). */
 export const NODE_TYPE_COLORS = {
 	geometry:   '#2A5555',
 	vectorMath: '#253068',
@@ -33,6 +35,8 @@ export const NODE_TYPE_COLORS = {
 	output:     '#2E1E1E',
 	groupIn:    '#3C2E0E',
 	groupOut:   '#3C2E0E',
+	colorRamp:  '#3A285A',
+	mixColor:   '#5A3820',
 };
 
 /** Wire / socket dot colour for each socket type. */

@@ -36,6 +36,7 @@ import { __ } from '@wordpress/i18n';
 
 import InteractiveDiagram from './interactive-diagram';
 import { NODE_TYPES, SOCKET_TYPES, NODE_TYPE_COLORS, SOCKET_COLORS } from './constants';
+import { MIX_BLEND_MODES, DEFAULT_RAMP_STOPS } from './node-layout';
 
 // ─── Auto-layout ──────────────────────────────────────────────────────────────
 
@@ -96,38 +97,91 @@ const deepClone = ( val ) => JSON.parse( JSON.stringify( val ) );
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SocketRow( { socket, onChange, onRemove } ) {
+	const isColor = socket.type === 'color';
+
 	return (
-		<Flex align="flex-end" gap={ 2 } style={ { marginBottom: 4 } }>
-			<FlexBlock>
-				<TextControl
-					label="" aria-label={ __( 'Socket label', 'blender-node-diagram' ) }
-					placeholder={ __( 'Label', 'blender-node-diagram' ) }
-					value={ socket.label }
-					onChange={ ( val ) => onChange( { ...socket, label: val } ) }
-					__nextHasNoMarginBottom
-				/>
-			</FlexBlock>
-			<FlexItem style={ { width: 90 } }>
-				<SelectControl
-					label="" aria-label={ __( 'Socket type', 'blender-node-diagram' ) }
-					value={ socket.type }
-					options={ SOCKET_TYPES }
-					onChange={ ( val ) => onChange( { ...socket, type: val } ) }
-					__nextHasNoMarginBottom
-				/>
-			</FlexItem>
-			<FlexItem>
-				<span style={ {
-					display: 'inline-block', width: 10, height: 10,
-					borderRadius: '50%', background: SOCKET_COLORS[ socket.type ] ?? '#888',
-					marginBottom: 6,
-				} } />
-			</FlexItem>
-			<FlexItem>
-				<Button isSmall isDestructive icon="remove" onClick={ onRemove }
-					label={ __( 'Remove socket', 'blender-node-diagram' ) } />
-			</FlexItem>
-		</Flex>
+		<div style={ { marginBottom: 6 } }>
+			{/* ── Row 1: label / type / dot / remove ── */}
+			<Flex align="flex-end" gap={ 2 }>
+				<FlexBlock>
+					<TextControl
+						label="" aria-label={ __( 'Socket label', 'blender-node-diagram' ) }
+						placeholder={ __( 'Label', 'blender-node-diagram' ) }
+						value={ socket.label }
+						onChange={ ( val ) => onChange( { ...socket, label: val } ) }
+						__nextHasNoMarginBottom
+					/>
+				</FlexBlock>
+				<FlexItem style={ { width: 90 } }>
+					<SelectControl
+						label="" aria-label={ __( 'Socket type', 'blender-node-diagram' ) }
+						value={ socket.type }
+						options={ SOCKET_TYPES }
+						onChange={ ( val ) => {
+							// Clear defaultColor when switching away from color type
+							const update = { ...socket, type: val };
+							if ( val !== 'color' ) delete update.defaultColor;
+							onChange( update );
+						} }
+						__nextHasNoMarginBottom
+					/>
+				</FlexItem>
+				<FlexItem>
+					<span style={ {
+						display: 'inline-block', width: 10, height: 10,
+						borderRadius: '50%', background: SOCKET_COLORS[ socket.type ] ?? '#888',
+						marginBottom: 6,
+					} } />
+				</FlexItem>
+				<FlexItem>
+					<Button isSmall isDestructive icon="remove" onClick={ onRemove }
+						label={ __( 'Remove socket', 'blender-node-diagram' ) } />
+				</FlexItem>
+			</Flex>
+
+			{/* ── Row 2: default color picker (color sockets only) ── */}
+			{ isColor && (
+				<Flex align="center" gap={ 2 } style={ { marginTop: 4, paddingLeft: 2 } }>
+					<FlexItem>
+						<span style={ { fontSize: 10, color: '#666', fontFamily: 'monospace', whiteSpace: 'nowrap' } }>
+							{ __( 'Default color', 'blender-node-diagram' ) }
+						</span>
+					</FlexItem>
+					<FlexBlock>
+						<input
+							type="color"
+							value={ socket.defaultColor ?? '#ffffff' }
+							title={ __( 'Default color shown in the node when socket is unconnected', 'blender-node-diagram' ) }
+							style={ {
+								width: '100%', height: 22,
+								border: '1px solid #333', borderRadius: 3,
+								cursor: 'pointer', padding: 1,
+								background: 'none', display: 'block',
+							} }
+							onChange={ ( e ) => onChange( { ...socket, defaultColor: e.target.value } ) }
+						/>
+					</FlexBlock>
+					{ socket.defaultColor && (
+						<FlexItem>
+							<Button
+								isSmall
+								variant="tertiary"
+								onClick={ () => {
+									const s = { ...socket };
+									delete s.defaultColor;
+									onChange( s );
+								} }
+								label={ __( 'Clear default color', 'blender-node-diagram' ) }
+								title={ __( 'Clear', 'blender-node-diagram' ) }
+								style={ { fontSize: 10 } }
+							>
+								{ __( 'Clear', 'blender-node-diagram' ) }
+							</Button>
+						</FlexItem>
+					) }
+				</Flex>
+			) }
+		</div>
 	);
 }
 
@@ -480,6 +534,85 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 											onAddSocket={ () => addDraftSocket( 'outputs' ) }
 											onRemoveSocket={ ( i ) => removeDraftSocket( 'outputs', i ) }
 										/>
+
+										{/* ── Color Ramp stops ──────────────────────────────── */}
+										{ draft.type === 'colorRamp' && (
+											<div style={ { marginTop: 10 } }>
+												<Flex align="center" justify="space-between" style={ { marginBottom: 6 } }>
+													<strong style={ LABEL_STYLE }>
+														{ __( 'Ramp Stops', 'blender-node-diagram' ) }
+													</strong>
+													<Button isSmall variant="secondary" icon="plus"
+														onClick={ () => {
+															const stops = draft.rampStops?.length
+																? [ ...draft.rampStops ]
+																: [ ...DEFAULT_RAMP_STOPS ];
+															stops.push( { pos: 0.5, color: '#888888' } );
+															setDraft( ( d ) => ( { ...d, rampStops: stops } ) );
+														} }>
+														{ __( 'Add Stop', 'blender-node-diagram' ) }
+													</Button>
+												</Flex>
+												{ ( draft.rampStops ?? DEFAULT_RAMP_STOPS ).map( ( stop, si ) => (
+													<Flex key={ si } align="flex-end" gap={ 2 } style={ { marginBottom: 4 } }>
+														<FlexItem style={ { width: 60 } }>
+															<TextControl
+																label={ si === 0 ? __( 'Pos', 'blender-node-diagram' ) : '' }
+																type="number" min={ 0 } max={ 1 } step={ 0.01 }
+																value={ stop.pos }
+																onChange={ ( val ) => {
+																	const stops = [ ...( draft.rampStops ?? DEFAULT_RAMP_STOPS ) ];
+																	stops[ si ] = { ...stops[ si ], pos: parseFloat( val ) };
+																	setDraft( ( d ) => ( { ...d, rampStops: stops } ) );
+																} }
+																__nextHasNoMarginBottom
+															/>
+														</FlexItem>
+														<FlexBlock>
+															<div style={ { paddingBottom: 2 } }>
+																{ si === 0 && (
+																	<label style={ { display: 'block', fontSize: 11, color: '#888', marginBottom: 4 } }>
+																		{ __( 'Color', 'blender-node-diagram' ) }
+																	</label>
+																) }
+																<input
+																	type="color"
+																	value={ stop.color }
+																	style={ { width: '100%', height: 28, border: '1px solid #333', borderRadius: 3, cursor: 'pointer', background: 'none' } }
+																	onChange={ ( e ) => {
+																		const stops = [ ...( draft.rampStops ?? DEFAULT_RAMP_STOPS ) ];
+																		stops[ si ] = { ...stops[ si ], color: e.target.value };
+																		setDraft( ( d ) => ( { ...d, rampStops: stops } ) );
+																	} }
+																/>
+															</div>
+														</FlexBlock>
+														<FlexItem>
+															<Button isSmall isDestructive icon="remove"
+																label={ __( 'Remove stop', 'blender-node-diagram' ) }
+																onClick={ () => {
+																	const stops = ( draft.rampStops ?? DEFAULT_RAMP_STOPS ).filter( ( _, j ) => j !== si );
+																	setDraft( ( d ) => ( { ...d, rampStops: stops } ) );
+																} }
+															/>
+														</FlexItem>
+													</Flex>
+												) ) }
+											</div>
+										) }
+
+										{/* ── Mix Color blend mode ───────────────────────────── */}
+										{ draft.type === 'mixColor' && (
+											<div style={ { marginTop: 10 } }>
+												<SelectControl
+													label={ __( 'Blend Mode', 'blender-node-diagram' ) }
+													value={ draft.blendMode ?? 'Mix' }
+													options={ MIX_BLEND_MODES.map( ( m ) => ( { label: m, value: m } ) ) }
+													onChange={ ( val ) => setDraft( ( d ) => ( { ...d, blendMode: val } ) ) }
+													__nextHasNoMarginBottom
+												/>
+											</div>
+										) }
 
 										<Flex gap={ 2 } style={ { marginTop: 10 } }>
 											<Button variant="primary" isSmall onClick={ saveEditing }>
