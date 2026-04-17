@@ -136,7 +136,7 @@ function SocketList( { title, sockets, onChangeSocket, onAddSocket, onRemoveSock
 		<div style={ { marginTop: 10 } }>
 			<Flex align="center" justify="space-between" style={ { marginBottom: 6 } }>
 				<strong style={ LABEL_STYLE }>{ title }</strong>
-				<Button isSmall icon="plus" onClick={ onAddSocket }>
+				<Button isSmall variant="secondary" icon="plus" onClick={ onAddSocket }>
 					{ __( 'Add', 'blender-node-diagram' ) }
 				</Button>
 			</Flex>
