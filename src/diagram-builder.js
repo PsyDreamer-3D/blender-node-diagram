@@ -254,21 +254,20 @@ function TemplateCard( { tpl, onStamp, onDelete } ) {
 		} }>
 			<Flex align="center">
 				<FlexBlock>
-					<span style={ { fontSize: 11, fontFamily: 'monospace', color: '#ccc' } }>
-						{ tpl.name }
-					</span>
 					<span style={ {
-						display: 'inline-block', padding: '0 4px', marginLeft: 5,
+						display: 'block', padding: '0 4px',
 						fontSize: 9, fontFamily: 'monospace',
-						background: hColor, color: '#ddd', borderRadius: 2,
+						background: hColor, color: '#ddd', borderRadius: 2, width: "max-content"
 					} }>
 						{ tpl.category }
 					</span>
 					{ tpl.builtIn && (
-						<span style={ { marginLeft: 4, fontSize: 9, color: '#555' } } title="Built-in">🔒</span>
+						<span style={ { marginRight: 5, fontSize: 9, color: '#555' } } title="Built-in">🔒</span>
 					) }
+					<span style={ { display: 'inline-block', fontSize: 11, fontFamily: 'monospace', color: '#ccc', marginBottom: 3 } }>
+						{ tpl.name }
+					</span>
 				</FlexBlock>
-				<Flex gap={ 1 }>
 					<Button isSmall variant="secondary" onClick={ () => onStamp( tpl ) }>
 						{ __( 'Stamp', 'blender-node-diagram' ) }
 					</Button>
@@ -278,10 +277,9 @@ function TemplateCard( { tpl, onStamp, onDelete } ) {
 							onClick={ () => onDelete( tpl.id ) }
 						/>
 					) }
-				</Flex>
 			</Flex>
 			{ tpl.description && (
-				<p style={ { fontSize: 9, color: '#555', margin: '3px 0 0', fontFamily: 'monospace' } }>
+				<p style={ { fontSize: 9, color: "rgb(138, 138, 138)", margin: '3px 0 0', fontFamily: 'monospace' } }>
 					{ tpl.description }
 				</p>
 			) }
