@@ -511,10 +511,15 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 			title={ __( 'Diagram Builder', 'blender-node-diagram' ) }
 			onRequestClose={ onClose }
 			isFullScreen
+			className="bnd-builder-modal"
 		>
 			<div style={ {
-				display: 'flex', height: 'calc(100vh - 120px)', overflow: 'hidden',
+				position: 'absolute', inset: 0,
+				display: 'flex', flexDirection: 'column', overflow: 'hidden',
 			} }>
+
+				{/* ── Main row: left panel + canvas ─────────────────────────── */}
+				<div style={ { display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' } }>
 
 				{/* ═══ Left panel ══════════════════════════════════════════════ */}
 				<div style={ {
@@ -998,13 +1003,13 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 						</div>
 					) }
 				</div>
-			</div>
+				</div> {/* end main row */}
 
 			{/* ═══ Footer ══════════════════════════════════════════════════════ */}
 			<div style={ {
 				padding: '12px 16px', borderTop: BORDER,
 				display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-				gap: 8, background: PANEL_BG,
+				gap: 8, background: PANEL_BG, flexShrink: 0,
 			} }>
 				<span style={ { marginRight: 'auto', fontSize: 11, color: '#444', fontFamily: 'monospace' } }>
 					{ nodes.length } { __( 'nodes', 'blender-node-diagram' ) }
@@ -1018,6 +1023,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 					{ __( 'Apply to Block', 'blender-node-diagram' ) }
 				</Button>
 			</div>
+			</div> {/* end absolute wrapper */}
 		</Modal>
 	);
 }
