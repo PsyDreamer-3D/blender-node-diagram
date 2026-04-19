@@ -21,7 +21,7 @@
  *   onClose()    — called when user cancels or closes the modal
  */
 
-import { useState, useCallback, useEffect } from '@wordpress/element';
+import { useState, useCallback, useEffect, useRef } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import {
 	Modal,
@@ -302,6 +302,8 @@ const LABEL_STYLE = {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DiagramBuilder( { initialData, onApply, onClose } ) {
+	const diagramRef = useRef( null );
+
 	const [ nodes,          setNodes          ] = useState( () => initialData?.nodes       ?? [] );
 	const [ connections,    setConnections    ] = useState( () => initialData?.connections ?? [] );
 	const [ editingId,      setEditingId      ] = useState( null );
@@ -310,6 +312,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 	const [ connError,      setConnError      ] = useState( '' );
 	const [ userTemplates,  setUserTemplates  ] = useState( [] );
 	const [ tplSearch,      setTplSearch      ] = useState( '' );
+	const [ tplCategory,    setTplCategory    ] = useState( '' );
 	const [ savingTpl,      setSavingTpl      ] = useState( false );
 
 	// Fetch user templates on mount
@@ -528,6 +531,32 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 						<strong style={ { ...LABEL_STYLE, display: 'block', marginBottom: 6 } }>
 							{ __( 'Templates', 'blender-node-diagram' ) }
 						</strong>
+
+						{/* Category filter pills */}
+						<div style={ { display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 } }>
+							{ NODE_CATEGORIES.map( ( { label, value } ) => {
+								const active  = tplCategory === value;
+								const hColor  = CATEGORY_COLORS[ value ]?.h ?? '#333';
+								return (
+									<button
+										key={ value }
+										onClick={ () => setTplCategory( active ? '' : value ) }
+										title={ label }
+										style={ {
+											padding: '2px 6px', fontSize: 9,
+											fontFamily: 'monospace', borderRadius: 2,
+											border: active ? `1px solid ${ hColor }` : '1px solid #2a2a2a',
+											background: active ? hColor : '#111',
+											color: active ? '#eee' : '#555',
+											cursor: 'pointer', lineHeight: '1.4',
+										} }
+									>
+										{ label }
+									</button>
+								);
+							} ) }
+						</div>
+
 						<input
 							type="search"
 							placeholder={ __( 'Search templates…', 'blender-node-diagram' ) }
@@ -540,52 +569,51 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 							} }
 						/>
 
-						{ /* Built-in templates */ }
 						{ ( () => {
-							const q = tplSearch.toLowerCase();
-							const list = BUILTIN_TEMPLATES.filter( ( t ) =>
-								! q || t.name.toLowerCase().includes( q ) || t.category.includes( q )
-							);
-							if ( list.length === 0 ) return null;
+							const q    = tplSearch.toLowerCase();
+							const test = ( t ) =>
+								( ! tplCategory || t.category === tplCategory ) &&
+								( ! q || t.name.toLowerCase().includes( q ) || t.category.includes( q ) );
+
+							const builtins = BUILTIN_TEMPLATES.filter( test );
+							const user     = userTemplates.filter( test );
+
+							if ( ! builtins.length && ! user.length ) {
+								return (
+									<p style={ { color: '#444', fontSize: 11, fontStyle: 'italic' } }>
+										{ __( 'No templates match.', 'blender-node-diagram' ) }
+									</p>
+								);
+							}
+
 							return (
 								<>
-									<p style={ { fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px', fontFamily: 'monospace' } }>
-										{ __( 'Built-in', 'blender-node-diagram' ) }
-									</p>
-									{ list.map( ( tpl ) => (
-										<TemplateCard key={ tpl.id } tpl={ tpl } onStamp={ addNodeFromTemplate } />
-									) ) }
+									{ builtins.length > 0 && (
+										<>
+											<p style={ { fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px', fontFamily: 'monospace' } }>
+												{ __( 'Built-in', 'blender-node-diagram' ) }
+											</p>
+											{ builtins.map( ( tpl ) => (
+												<TemplateCard key={ tpl.id } tpl={ tpl } onStamp={ addNodeFromTemplate } />
+											) ) }
+										</>
+									) }
+									{ user.length > 0 && (
+										<>
+											<p style={ { fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '8px 0 4px', fontFamily: 'monospace' } }>
+												{ __( 'My Templates', 'blender-node-diagram' ) }
+											</p>
+											{ user.map( ( tpl ) => (
+												<TemplateCard key={ tpl.id } tpl={ tpl }
+													onStamp={ addNodeFromTemplate }
+													onDelete={ deleteUserTemplate }
+												/>
+											) ) }
+										</>
+									) }
 								</>
 							);
 						} )() }
-
-						{ /* User templates */ }
-						{ ( () => {
-							const q = tplSearch.toLowerCase();
-							const list = userTemplates.filter( ( t ) =>
-								! q || t.name.toLowerCase().includes( q ) || t.category.includes( q )
-							);
-							if ( list.length === 0 ) return null;
-							return (
-								<>
-									<p style={ { fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '8px 0 4px', fontFamily: 'monospace' } }>
-										{ __( 'My Templates', 'blender-node-diagram' ) }
-									</p>
-									{ list.map( ( tpl ) => (
-										<TemplateCard key={ tpl.id } tpl={ tpl }
-											onStamp={ addNodeFromTemplate }
-											onDelete={ deleteUserTemplate }
-										/>
-									) ) }
-								</>
-							);
-						} )() }
-
-						{ tplSearch === '' && BUILTIN_TEMPLATES.length === 0 && userTemplates.length === 0 && (
-							<p style={ { color: '#444', fontSize: 11, fontStyle: 'italic' } }>
-								{ __( 'No templates yet.', 'blender-node-diagram' ) }
-							</p>
-						) }
 					</section>
 
 					{/* ── Nodes ──────────────────────────────────────────────── */}
@@ -919,11 +947,10 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 
 				{/* ═══ Right panel — interactive canvas ═══════════════════════ */}
 				<div style={ {
-					flex: 1, overflow: 'auto',
+					flex: 1, overflow: 'hidden', position: 'relative',
 					background: '#0f0f0f',
 					backgroundImage: 'radial-gradient(circle, #1e1e1e 1px, transparent 1px)',
 					backgroundSize: '22px 22px',
-					padding: 12, position: 'relative',
 				} }>
 					{ previewNodes.length === 0 ? (
 						<div style={ {
@@ -935,6 +962,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 						</div>
 					) : (
 						<InteractiveDiagram
+							ref={ diagramRef }
 							nodes={ previewNodes }
 							connections={ connections }
 							editingId={ editingId }
@@ -942,6 +970,34 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 							onNodeSelect={ handleNodeSelect }
 							onConnect={ handleConnect }
 						/>
+					) }
+
+					{/* Zoom controls */}
+					{ previewNodes.length > 0 && (
+						<div style={ {
+							position: 'absolute', bottom: 10, right: 10,
+							display: 'flex', flexDirection: 'column', gap: 2,
+							zIndex: 1,
+						} }>
+							<Button isSmall variant="secondary"
+								onClick={ () => diagramRef.current?.fitView() }
+								title={ __( 'Fit all nodes into view', 'blender-node-diagram' ) }
+								style={ { minWidth: 28, justifyContent: 'center', fontFamily: 'monospace' } }>
+								⊡
+							</Button>
+							<Button isSmall variant="secondary"
+								onClick={ () => diagramRef.current?.zoomIn() }
+								title={ __( 'Zoom in', 'blender-node-diagram' ) }
+								style={ { minWidth: 28, justifyContent: 'center', fontFamily: 'monospace', fontSize: 16 } }>
+								+
+							</Button>
+							<Button isSmall variant="secondary"
+								onClick={ () => diagramRef.current?.zoomOut() }
+								title={ __( 'Zoom out', 'blender-node-diagram' ) }
+								style={ { minWidth: 28, justifyContent: 'center', fontFamily: 'monospace', fontSize: 16 } }>
+								−
+							</Button>
+						</div>
 					) }
 				</div>
 			</div>

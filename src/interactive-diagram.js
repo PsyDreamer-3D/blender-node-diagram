@@ -4,17 +4,23 @@
  * React component that renders an interactive Blender node diagram.
  *
  * Interactions:
- *   Drag node header      → reposition (onNodeMove)
- *   Click node header     → select / open accordion (onNodeSelect)
- *   Drag output socket    → live bezier wire; drop on input to connect (onConnect)
- *   Hover input sockets   → highlight compatible drop targets
+ *   Scroll wheel             → zoom toward cursor
+ *   Middle-mouse drag        → pan canvas
+ *   Drag node header         → reposition (onNodeMove)
+ *   Click node header        → select / open accordion (onNodeSelect)
+ *   Drag output socket       → live bezier wire; drop on input to connect (onConnect)
+ *   Hover input sockets      → highlight compatible drop targets
  *
- * Supported special node types (from node-layout.js):
- *   colorRamp  — renders a gradient bar; reads node.rampStops
- *   mixColor   — renders a blend-mode pill; reads node.blendMode
+ * Imperative API (via ref):
+ *   ref.current.zoomIn()
+ *   ref.current.zoomOut()
+ *   ref.current.fitView()
  */
 
-import { useState, useRef, useCallback, useMemo } from '@wordpress/element';
+import {
+	useState, useRef, useCallback, useMemo,
+	useEffect, forwardRef, useImperativeHandle,
+} from '@wordpress/element';
 import {
 	NW, HH, SK, PAD,
 	nodeColors, nodeSubtype, SOCK_CLR,
@@ -24,7 +30,10 @@ import {
 	SWATCH_W, SWATCH_H, SWATCH_GAP,
 } from './node-layout';
 
-const SK_HOV = 7;   // socket radius when highlighted during wiring
+const SK_HOV    = 7;     // socket radius when highlighted during wiring
+const ZOOM_MIN  = 0.15;
+const ZOOM_MAX  = 5;
+const ZOOM_STEP = 1.2;   // factor per button click
 
 // ─── Bezier wire path ─────────────────────────────────────────────────────────
 
@@ -264,7 +273,6 @@ function NodeGroup( {
 				);
 			} ) }
 
-
 			{/* ── Output sockets ──────────────────────────────────────────── */}
 			{ node.outputs.map( ( sock, i ) => {
 				const p         = outPos( node, i );
@@ -301,42 +309,127 @@ function NodeGroup( {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function InteractiveDiagram( {
+const InteractiveDiagram = forwardRef( function InteractiveDiagram( {
 	nodes,
 	connections,
 	editingId,
 	onNodeMove,
 	onNodeSelect,
 	onConnect,
-} ) {
-	const svgRef                      = useRef( null );
-	const [ dragState,    setDragState    ] = useState( null );
-	const [ pendingWire,  setPendingWire  ] = useState( null );
+}, ref ) {
+	const svgRef = useRef( null );
 
-	// ── SVG coordinate helper ────────────────────────────────────────────────
+	// ── Interaction state ────────────────────────────────────────────────────
+	const [ dragState,   setDragState   ] = useState( null );
+	const [ pendingWire, setPendingWire  ] = useState( null );
+	const [ panState,    setPanState    ] = useState( null );
+
+	// ── Zoom / pan transform ─────────────────────────────────────────────────
+	const [ transform, setTransform ] = useState( { x: 20, y: 20, scale: 1 } );
+
+	// Ref mirrors state so the non-passive wheel listener can read it without
+	// a stale closure (the listener is only registered once, on mount).
+	const transformRef = useRef( transform );
+	useEffect( () => { transformRef.current = transform; }, [ transform ] );
+
+	// ── Coordinate helpers ───────────────────────────────────────────────────
+
+	/** Screen coords → SVG viewport coords (no canvas transform applied). */
 	const toSVGPoint = useCallback( ( e ) => {
-		const svg = svgRef.current;
-		if ( ! svg ) return { x: 0, y: 0 };
-		const pt = svg.createSVGPoint();
-		pt.x = e.clientX;
-		pt.y = e.clientY;
-		return pt.matrixTransform( svg.getScreenCTM().inverse() );
+		const rect = svgRef.current?.getBoundingClientRect();
+		if ( ! rect ) return { x: 0, y: 0 };
+		return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 	}, [] );
+
+	/** SVG viewport coords → diagram / world coords (inverse of canvas transform). */
+	const toDiagramPoint = useCallback( ( svgPt ) => {
+		const t = transformRef.current;
+		return {
+			x: ( svgPt.x - t.x ) / t.scale,
+			y: ( svgPt.y - t.y ) / t.scale,
+		};
+	}, [] );
+
+	// ── Wheel zoom (non-passive so we can preventDefault) ────────────────────
+	useEffect( () => {
+		const svg = svgRef.current;
+		if ( ! svg ) return;
+
+		const onWheel = ( e ) => {
+			e.preventDefault();
+			const rect   = svg.getBoundingClientRect();
+			const mouseX = e.clientX - rect.left;
+			const mouseY = e.clientY - rect.top;
+			const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+			const prev   = transformRef.current;
+			const next   = Math.min( Math.max( prev.scale * factor, ZOOM_MIN ), ZOOM_MAX );
+
+			setTransform( {
+				scale: next,
+				x: mouseX - ( mouseX - prev.x ) * ( next / prev.scale ),
+				y: mouseY - ( mouseY - prev.y ) * ( next / prev.scale ),
+			} );
+		};
+
+		svg.addEventListener( 'wheel', onWheel, { passive: false } );
+		return () => svg.removeEventListener( 'wheel', onWheel );
+	}, [] );
+
+	// ── Fit-to-content ───────────────────────────────────────────────────────
+	const fitView = useCallback( () => {
+		const svg = svgRef.current;
+		if ( ! svg || ! nodes.length ) return;
+		const { width: cw, height: ch } = svg.getBoundingClientRect();
+		if ( ! cw || ! ch ) return;
+
+		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		nodes.forEach( ( n ) => {
+			minX = Math.min( minX, n.x );
+			minY = Math.min( minY, n.y );
+			maxX = Math.max( maxX, n.x + NW );
+			maxY = Math.max( maxY, n.y + nodeH( n ) );
+		} );
+
+		const pad      = 40;
+		const contentW = maxX - minX + pad * 2;
+		const contentH = maxY - minY + pad * 2;
+		const scale    = Math.min( cw / contentW, ch / contentH, 2 );
+
+		setTransform( {
+			scale,
+			x: cw / 2 - ( ( minX + maxX ) / 2 ) * scale,
+			y: ch / 2 - ( ( minY + maxY ) / 2 ) * scale,
+		} );
+	}, [ nodes ] );
+
+	// ── Imperative handle ────────────────────────────────────────────────────
+	useImperativeHandle( ref, () => ( {
+		zoomIn:  () => setTransform( ( t ) => ( {
+			...t,
+			scale: Math.min( t.scale * ZOOM_STEP, ZOOM_MAX ),
+		} ) ),
+		zoomOut: () => setTransform( ( t ) => ( {
+			...t,
+			scale: Math.max( t.scale / ZOOM_STEP, ZOOM_MIN ),
+		} ) ),
+		fitView,
+	} ), [ fitView ] );
 
 	// ── Node drag ────────────────────────────────────────────────────────────
 	const handleHeaderMouseDown = useCallback( ( e, nodeId, nodeX, nodeY ) => {
 		if ( pendingWire ) return;
 		e.preventDefault();
 		e.stopPropagation();
-		const pt = toSVGPoint( e );
-		setDragState( { nodeId, startSvgX: pt.x, startSvgY: pt.y, startNodeX: nodeX, startNodeY: nodeY } );
-	}, [ pendingWire, toSVGPoint ] );
+		const diagPt = toDiagramPoint( toSVGPoint( e ) );
+		setDragState( { nodeId, startDiagX: diagPt.x, startDiagY: diagPt.y, startNodeX: nodeX, startNodeY: nodeY } );
+	}, [ pendingWire, toSVGPoint, toDiagramPoint ] );
 
 	// ── Output socket → begin wire ────────────────────────────────────────────
-	const handleOutputSocketMouseDown = useCallback( ( e, nodeId, socketIdx, socketType, svgX, svgY ) => {
+	// x / y are already diagram coords (from outPos)
+	const handleOutputSocketMouseDown = useCallback( ( e, nodeId, socketIdx, socketType, diagX, diagY ) => {
 		e.preventDefault();
 		e.stopPropagation();
-		setPendingWire( { fromId: nodeId, fromOut: socketIdx, type: socketType, x1: svgX, y1: svgY, x2: svgX, y2: svgY } );
+		setPendingWire( { fromId: nodeId, fromOut: socketIdx, type: socketType, x1: diagX, y1: diagY, x2: diagX, y2: diagY } );
 	}, [] );
 
 	// ── Input socket → complete wire ──────────────────────────────────────────
@@ -349,36 +442,49 @@ export default function InteractiveDiagram( {
 		setPendingWire( null );
 	}, [ pendingWire, onConnect ] );
 
+	// ── SVG background mousedown — start middle-mouse pan ────────────────────
+	const handleSVGMouseDown = useCallback( ( e ) => {
+		if ( e.button !== 1 ) return;
+		e.preventDefault();
+		const svgPt = toSVGPoint( e );
+		const t     = transformRef.current;
+		setPanState( { startX: svgPt.x, startY: svgPt.y, startTx: t.x, startTy: t.y } );
+	}, [ toSVGPoint ] );
+
 	// ── Mouse move ────────────────────────────────────────────────────────────
 	const handleMouseMove = useCallback( ( e ) => {
-		const pt = toSVGPoint( e );
+		const svgPt = toSVGPoint( e );
+
+		if ( panState ) {
+			setTransform( ( t ) => ( {
+				...t,
+				x: panState.startTx + ( svgPt.x - panState.startX ),
+				y: panState.startTy + ( svgPt.y - panState.startY ),
+			} ) );
+			return;
+		}
+
 		if ( dragState ) {
+			const diagPt = toDiagramPoint( svgPt );
 			onNodeMove(
 				dragState.nodeId,
-				Math.round( dragState.startNodeX + ( pt.x - dragState.startSvgX ) ),
-				Math.round( dragState.startNodeY + ( pt.y - dragState.startSvgY ) )
+				Math.round( dragState.startNodeX + ( diagPt.x - dragState.startDiagX ) ),
+				Math.round( dragState.startNodeY + ( diagPt.y - dragState.startDiagY ) )
 			);
 		}
+
 		if ( pendingWire ) {
-			setPendingWire( ( pw ) => pw ? { ...pw, x2: pt.x, y2: pt.y } : pw );
+			const diagPt = toDiagramPoint( svgPt );
+			setPendingWire( ( pw ) => pw ? { ...pw, x2: diagPt.x, y2: diagPt.y } : pw );
 		}
-	}, [ dragState, pendingWire, toSVGPoint, onNodeMove ] );
+	}, [ panState, dragState, pendingWire, toSVGPoint, toDiagramPoint, onNodeMove ] );
 
 	// ── Release ───────────────────────────────────────────────────────────────
 	const handleRelease = useCallback( () => {
 		setDragState( null );
 		setPendingWire( null );
+		setPanState( null );
 	}, [] );
-
-	// ── ViewBox (auto-sized) ──────────────────────────────────────────────────
-	const { vbWidth, vbHeight } = useMemo( () => {
-		let maxX = 400, maxY = 200;
-		nodes.forEach( ( n ) => {
-			maxX = Math.max( maxX, n.x + NW );
-			maxY = Math.max( maxY, n.y + nodeH( n ) );
-		} );
-		return { vbWidth: maxX + PAD, vbHeight: maxY + PAD };
-	}, [ nodes ] );
 
 	// ── Node map ──────────────────────────────────────────────────────────────
 	const nodeMap = useMemo( () => {
@@ -387,53 +493,61 @@ export default function InteractiveDiagram( {
 		return m;
 	}, [ nodes ] );
 
-	const cursor = dragState   ? 'grabbing'
+	const cursor = panState    ? 'move'
+	             : dragState   ? 'grabbing'
 	             : pendingWire ? 'crosshair'
 	             : 'default';
+
+	const canvasTransform = `translate(${ transform.x },${ transform.y }) scale(${ transform.scale })`;
 
 	return (
 		<svg
 			ref={ svgRef }
-			viewBox={ `0 0 ${ vbWidth } ${ vbHeight }` }
-			width={ vbWidth }
-			height={ vbHeight }
+			width="100%"
+			height="100%"
+			onMouseDown={ handleSVGMouseDown }
 			onMouseMove={ handleMouseMove }
 			onMouseUp={ handleRelease }
 			onMouseLeave={ handleRelease }
 			style={ { display: 'block', cursor } }
 		>
-			{/* Committed wires */}
-			{ connections.map( ( conn, i ) => (
-				<Wire key={ i } conn={ conn } nodeMap={ nodeMap } />
-			) ) }
+			{/* All diagram content lives inside this transform group */}
+			<g transform={ canvasTransform }>
+				{/* Committed wires */}
+				{ connections.map( ( conn, i ) => (
+					<Wire key={ i } conn={ conn } nodeMap={ nodeMap } />
+				) ) }
 
-			{/* Nodes */}
-			{ nodes.map( ( node ) => (
-				<NodeGroup
-					key={ node.id }
-					node={ node }
-					isEditing={ editingId === node.id }
-					isDragging={ dragState?.nodeId === node.id }
-					pendingWireType={ pendingWire?.type ?? null }
-					onHeaderMouseDown={ handleHeaderMouseDown }
-					onHeaderClick={ onNodeSelect }
-					onOutputSocketMouseDown={ handleOutputSocketMouseDown }
-					onInputSocketMouseUp={ handleInputSocketMouseUp }
-				/>
-			) ) }
+				{/* Nodes */}
+				{ nodes.map( ( node ) => (
+					<NodeGroup
+						key={ node.id }
+						node={ node }
+						isEditing={ editingId === node.id }
+						isDragging={ dragState?.nodeId === node.id }
+						pendingWireType={ pendingWire?.type ?? null }
+						onHeaderMouseDown={ handleHeaderMouseDown }
+						onHeaderClick={ onNodeSelect }
+						onOutputSocketMouseDown={ handleOutputSocketMouseDown }
+						onInputSocketMouseUp={ handleInputSocketMouseUp }
+					/>
+				) ) }
 
-			{/* Pending wire (dashed, follows cursor) */}
-			{ pendingWire && (
-				<path
-					d={ wirePath( pendingWire.x1, pendingWire.y1, pendingWire.x2, pendingWire.y2 ) }
-					fill="none"
-					stroke={ SOCK_CLR[ pendingWire.type ] ?? '#888' }
-					strokeWidth="2"
-					opacity="0.9"
-					strokeDasharray="6 3"
-					style={ { pointerEvents: 'none' } }
-				/>
-			) }
+				{/* Pending wire (dashed, follows cursor) */}
+				{ pendingWire && (
+					<path
+						d={ wirePath( pendingWire.x1, pendingWire.y1, pendingWire.x2, pendingWire.y2 ) }
+						fill="none"
+						stroke={ SOCK_CLR[ pendingWire.type ] ?? '#888' }
+						strokeWidth="2"
+						opacity="0.9"
+						strokeDasharray="6 3"
+						style={ { pointerEvents: 'none' } }
+					/>
+				) }
+			</g>
 		</svg>
 	);
-}
+} );
+
+export default InteractiveDiagram;
