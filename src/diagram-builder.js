@@ -21,7 +21,8 @@
  *   onClose()    — called when user cancels or closes the modal
  */
 
-import { useState, useCallback } from '@wordpress/element';
+import { useState, useCallback, useEffect } from '@wordpress/element';
+import apiFetch from '@wordpress/api-fetch';
 import {
 	Modal,
 	Button,
@@ -35,8 +36,10 @@ import {
 import { __ } from '@wordpress/i18n';
 
 import InteractiveDiagram from './interactive-diagram';
-import { NODE_TYPES, SOCKET_TYPES, NODE_TYPE_COLORS, SOCKET_COLORS } from './constants';
-import { MIX_BLEND_MODES, DEFAULT_RAMP_STOPS } from './node-layout';
+import { NODE_CATEGORIES, SOCKET_TYPES, SOCKET_COLORS } from './constants';
+import { MIX_BLEND_MODES, DEFAULT_RAMP_STOPS, LEGACY_TYPE_CATEGORY, nodeColors } from './node-layout';
+import { CATEGORY_COLORS } from './node-categories';
+import { BUILTIN_TEMPLATES } from './node-templates';
 
 // ─── Auto-layout ──────────────────────────────────────────────────────────────
 
@@ -80,14 +83,31 @@ function autoLayout( nodes, connections ) {
 // ─── Factories ────────────────────────────────────────────────────────────────
 
 const newNode = () => ( {
-	id:      `node_${ Date.now() }`,
-	type:    'math',
-	label:   'Math\nAdd',
-	x:       0,
-	y:       80,
-	inputs:  [],
-	outputs: [],
+	id:       `node_${ Date.now() }`,
+	category: 'converter',
+	label:    'New Node',
+	x:        0,
+	y:        80,
+	inputs:   [],
+	outputs:  [],
 } );
+
+/** Find the first unoccupied grid slot for a stamped template node. */
+function stampPosition( existingNodes ) {
+	const STEP_X = 190, STEP_Y = 160, BASE_X = 40, BASE_Y = 40;
+	const occupied = new Set(
+		existingNodes.map( ( n ) => `${ Math.round( ( n.x - BASE_X ) / STEP_X ) },${ Math.round( ( n.y - BASE_Y ) / STEP_Y ) }` )
+	);
+	for ( let row = 0; row < 12; row++ ) {
+		for ( let col = 0; col < 12; col++ ) {
+			if ( ! occupied.has( `${ col },${ row }` ) ) {
+				return { x: BASE_X + col * STEP_X, y: BASE_Y + row * STEP_Y };
+			}
+		}
+	}
+	const maxY = existingNodes.reduce( ( m, n ) => Math.max( m, n.y ), 0 );
+	return { x: BASE_X, y: maxY + STEP_Y };
+}
 
 const newSocket = () => ( { label: '', type: 'value' } );
 const newConn   = () => ( { from: '', fromOut: 0, to: '', toIn: 0 } );
@@ -210,16 +230,62 @@ function SocketList( { title, sockets, onChangeSocket, onAddSocket, onRemoveSock
 	);
 }
 
-function TypeBadge( { type } ) {
+function TypeBadge( { node } ) {
+	const colors = nodeColors( node );
+	const label  = node.category || node.type || '—';
 	return (
 		<span style={ {
 			display: 'inline-block', padding: '1px 5px', marginLeft: 6,
 			fontSize: 10, fontFamily: 'monospace',
-			background: NODE_TYPE_COLORS[ type ] ?? '#333',
+			background: colors.h,
 			color: '#ddd', borderRadius: 2,
 		} }>
-			{ type }
+			{ label }
 		</span>
+	);
+}
+
+function TemplateCard( { tpl, onStamp, onDelete } ) {
+	const hColor = CATEGORY_COLORS[ tpl.category ]?.h ?? '#333';
+	return (
+		<div style={ {
+			marginBottom: 3, padding: '6px 8px',
+			background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 3,
+		} }>
+			<Flex align="center">
+				<FlexBlock>
+					<span style={ { fontSize: 11, fontFamily: 'monospace', color: '#ccc' } }>
+						{ tpl.name }
+					</span>
+					<span style={ {
+						display: 'inline-block', padding: '0 4px', marginLeft: 5,
+						fontSize: 9, fontFamily: 'monospace',
+						background: hColor, color: '#ddd', borderRadius: 2,
+					} }>
+						{ tpl.category }
+					</span>
+					{ tpl.builtIn && (
+						<span style={ { marginLeft: 4, fontSize: 9, color: '#555' } } title="Built-in">🔒</span>
+					) }
+				</FlexBlock>
+				<Flex gap={ 1 }>
+					<Button isSmall variant="secondary" onClick={ () => onStamp( tpl ) }>
+						{ __( 'Stamp', 'blender-node-diagram' ) }
+					</Button>
+					{ onDelete && (
+						<Button isSmall isDestructive icon="remove"
+							label={ __( 'Delete template', 'blender-node-diagram' ) }
+							onClick={ () => onDelete( tpl.id ) }
+						/>
+					) }
+				</Flex>
+			</Flex>
+			{ tpl.description && (
+				<p style={ { fontSize: 9, color: '#555', margin: '3px 0 0', fontFamily: 'monospace' } }>
+					{ tpl.description }
+				</p>
+			) }
+		</div>
 	);
 }
 
@@ -236,12 +302,22 @@ const LABEL_STYLE = {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DiagramBuilder( { initialData, onApply, onClose } ) {
-	const [ nodes,       setNodes       ] = useState( () => initialData?.nodes       ?? [] );
-	const [ connections, setConnections ] = useState( () => initialData?.connections ?? [] );
-	const [ editingId,   setEditingId   ] = useState( null );
-	const [ draft,       setDraft       ] = useState( null );
-	const [ connDraft,   setConnDraft   ] = useState( newConn );
-	const [ connError,   setConnError   ] = useState( '' );
+	const [ nodes,          setNodes          ] = useState( () => initialData?.nodes       ?? [] );
+	const [ connections,    setConnections    ] = useState( () => initialData?.connections ?? [] );
+	const [ editingId,      setEditingId      ] = useState( null );
+	const [ draft,          setDraft          ] = useState( null );
+	const [ connDraft,      setConnDraft      ] = useState( newConn );
+	const [ connError,      setConnError      ] = useState( '' );
+	const [ userTemplates,  setUserTemplates  ] = useState( [] );
+	const [ tplSearch,      setTplSearch      ] = useState( '' );
+	const [ savingTpl,      setSavingTpl      ] = useState( false );
+
+	// Fetch user templates on mount
+	useEffect( () => {
+		apiFetch( { path: '/blender-node-diagram/v1/templates' } )
+			.then( ( data ) => setUserTemplates( Array.isArray( data ) ? data : [] ) )
+			.catch( () => {} );
+	}, [] );
 
 	// ── Node operations ──────────────────────────────────────────────────────
 
@@ -324,6 +400,45 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 		}
 	}, [ connections ] );
 
+	// ── Template operations ───────────────────────────────────────────────────
+
+	const addNodeFromTemplate = useCallback( ( tpl ) => {
+		const pos  = stampPosition( nodes );
+		const node = {
+			id:       `node_${ Date.now() }`,
+			label:    tpl.name,
+			category: tpl.category,
+			...( tpl.subtype ? { subtype: tpl.subtype } : {} ),
+			inputs:   deepClone( tpl.inputs  ),
+			outputs:  deepClone( tpl.outputs ),
+			...pos,
+		};
+		setNodes( ( prev ) => [ ...prev, node ] );
+		startEditing( node );
+	}, [ nodes, startEditing ] );
+
+	const deleteUserTemplate = useCallback( ( id ) => {
+		apiFetch( { path: `/blender-node-diagram/v1/templates/${ id }`, method: 'DELETE' } )
+			.then( () => setUserTemplates( ( prev ) => prev.filter( ( t ) => t.id !== id ) ) )
+			.catch( () => {} );
+	}, [] );
+
+	const saveNodeAsTemplate = useCallback( () => {
+		if ( ! draft ) return;
+		setSavingTpl( true );
+		const tplData = {
+			name:     draft.label.replace( /\\n/g, ' ' ).trim() || 'Unnamed',
+			category: draft.category || LEGACY_TYPE_CATEGORY[ draft.type ] || 'input',
+			inputs:   deepClone( draft.inputs  ),
+			outputs:  deepClone( draft.outputs ),
+			...( draft.subtype ? { subtype: draft.subtype } : {} ),
+		};
+		apiFetch( { path: '/blender-node-diagram/v1/templates', method: 'POST', data: tplData } )
+			.then( ( created ) => setUserTemplates( ( prev ) => [ ...prev, created ] ) )
+			.catch( () => {} )
+			.finally( () => setSavingTpl( false ) );
+	}, [ draft ] );
+
 	// ── Draft socket helpers ──────────────────────────────────────────────────
 
 	const setDraftSocket = useCallback( ( side, index, updated ) => {
@@ -386,7 +501,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 	// ── Connection select options ─────────────────────────────────────────────
 	const nodeOptions = [
 		{ label: '— select node —', value: '' },
-		...nodes.map( ( n ) => ( { label: `${ n.id }  (${ n.type })`, value: n.id } ) ),
+		...nodes.map( ( n ) => ( { label: `${ n.id }  (${ n.category || n.type || '?' })`, value: n.id } ) ),
 	];
 
 	// ─────────────────────────────────────────────────────────────────────────
@@ -407,6 +522,71 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 					display: 'flex', flexDirection: 'column', gap: 24,
 					background: PANEL_BG,
 				} }>
+
+					{/* ── Templates ─────────────────────────────────────────── */}
+					<section>
+						<strong style={ { ...LABEL_STYLE, display: 'block', marginBottom: 6 } }>
+							{ __( 'Templates', 'blender-node-diagram' ) }
+						</strong>
+						<input
+							type="search"
+							placeholder={ __( 'Search templates…', 'blender-node-diagram' ) }
+							value={ tplSearch }
+							onChange={ ( e ) => setTplSearch( e.target.value ) }
+							style={ {
+								width: '100%', padding: '4px 6px', marginBottom: 8,
+								background: '#111', border: '1px solid #2a2a2a', borderRadius: 3,
+								color: '#ccc', fontSize: 11, fontFamily: 'monospace', boxSizing: 'border-box',
+							} }
+						/>
+
+						{ /* Built-in templates */ }
+						{ ( () => {
+							const q = tplSearch.toLowerCase();
+							const list = BUILTIN_TEMPLATES.filter( ( t ) =>
+								! q || t.name.toLowerCase().includes( q ) || t.category.includes( q )
+							);
+							if ( list.length === 0 ) return null;
+							return (
+								<>
+									<p style={ { fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px', fontFamily: 'monospace' } }>
+										{ __( 'Built-in', 'blender-node-diagram' ) }
+									</p>
+									{ list.map( ( tpl ) => (
+										<TemplateCard key={ tpl.id } tpl={ tpl } onStamp={ addNodeFromTemplate } />
+									) ) }
+								</>
+							);
+						} )() }
+
+						{ /* User templates */ }
+						{ ( () => {
+							const q = tplSearch.toLowerCase();
+							const list = userTemplates.filter( ( t ) =>
+								! q || t.name.toLowerCase().includes( q ) || t.category.includes( q )
+							);
+							if ( list.length === 0 ) return null;
+							return (
+								<>
+									<p style={ { fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '8px 0 4px', fontFamily: 'monospace' } }>
+										{ __( 'My Templates', 'blender-node-diagram' ) }
+									</p>
+									{ list.map( ( tpl ) => (
+										<TemplateCard key={ tpl.id } tpl={ tpl }
+											onStamp={ addNodeFromTemplate }
+											onDelete={ deleteUserTemplate }
+										/>
+									) ) }
+								</>
+							);
+						} )() }
+
+						{ tplSearch === '' && BUILTIN_TEMPLATES.length === 0 && userTemplates.length === 0 && (
+							<p style={ { color: '#444', fontSize: 11, fontStyle: 'italic' } }>
+								{ __( 'No templates yet.', 'blender-node-diagram' ) }
+							</p>
+						) }
+					</section>
 
 					{/* ── Nodes ──────────────────────────────────────────────── */}
 					<section>
@@ -446,7 +626,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 										<span style={ { fontSize: 12, fontFamily: 'monospace', color: '#ccc' } }>
 											{ node.id || '(unnamed)' }
 										</span>
-										<TypeBadge type={ node.type } />
+										<TypeBadge node={ node } />
 									</FlexBlock>
 									<FlexItem>
 										<Flex gap={ 1 }>
@@ -476,9 +656,24 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 											onChange={ ( val ) => setDraft( ( d ) => ( { ...d, id: val } ) ) }
 											__nextHasNoMarginBottom />
 										<div style={ { height: 8 } } />
-										<SelectControl label={ __( 'Type', 'blender-node-diagram' ) }
-											value={ draft.type } options={ NODE_TYPES }
-											onChange={ ( val ) => setDraft( ( d ) => ( { ...d, type: val } ) ) }
+										<SelectControl label={ __( 'Category', 'blender-node-diagram' ) }
+											value={ draft.category || LEGACY_TYPE_CATEGORY[ draft.type ] || 'input' }
+											options={ NODE_CATEGORIES }
+											onChange={ ( val ) => setDraft( ( d ) => ( { ...d, category: val } ) ) }
+											__nextHasNoMarginBottom />
+										<div style={ { height: 8 } } />
+										<SelectControl label={ __( 'Rendering Variant', 'blender-node-diagram' ) }
+											value={ draft.subtype || '' }
+											options={ [
+												{ label: __( 'Standard', 'blender-node-diagram' ),    value: '' },
+												{ label: __( 'Color Ramp', 'blender-node-diagram' ),  value: 'colorRamp' },
+												{ label: __( 'Mix Color', 'blender-node-diagram' ),   value: 'mixColor' },
+											] }
+											onChange={ ( val ) => setDraft( ( d ) => {
+												const upd = { ...d, subtype: val || undefined };
+												if ( ! val ) delete upd.subtype;
+												return upd;
+											} ) }
 											__nextHasNoMarginBottom />
 										<div style={ { height: 8 } } />
 										<TextControl label={ __( 'Label  (use \\n for two lines)', 'blender-node-diagram' ) }
@@ -536,7 +731,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 										/>
 
 										{/* ── Color Ramp stops ──────────────────────────────── */}
-										{ draft.type === 'colorRamp' && (
+										{ ( draft.subtype === 'colorRamp' || draft.type === 'colorRamp' ) && (
 											<div style={ { marginTop: 10 } }>
 												<Flex align="center" justify="space-between" style={ { marginBottom: 6 } }>
 													<strong style={ LABEL_STYLE }>
@@ -602,7 +797,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 										) }
 
 										{/* ── Mix Color blend mode ───────────────────────────── */}
-										{ draft.type === 'mixColor' && (
+										{ ( draft.subtype === 'mixColor' || draft.type === 'mixColor' ) && (
 											<div style={ { marginTop: 10 } }>
 												<SelectControl
 													label={ __( 'Blend Mode', 'blender-node-diagram' ) }
@@ -622,6 +817,15 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 												{ __( 'Cancel', 'blender-node-diagram' ) }
 											</Button>
 										</Flex>
+										<div style={ { marginTop: 6, borderTop: '1px solid #222', paddingTop: 6 } }>
+											<Button isSmall variant="tertiary" isBusy={ savingTpl }
+												disabled={ savingTpl }
+												onClick={ saveNodeAsTemplate }
+												title={ __( 'Save this node\'s configuration as a reusable template', 'blender-node-diagram' ) }
+											>
+												{ __( '+ Save as Template', 'blender-node-diagram' ) }
+											</Button>
+										</div>
 									</div>
 								) }
 							</div>

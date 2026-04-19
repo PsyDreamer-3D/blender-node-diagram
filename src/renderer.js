@@ -25,7 +25,7 @@
 
 import {
 	NW, HH, SK, PAD,
-	NODE_COLORS, SOCK_CLR,
+	nodeColors, nodeSubtype, SOCK_CLR,
 	nodeH, inPos, outPos,
 	DEFAULT_RAMP_STOPS, rampBarRect,
 	mixPillRect,
@@ -183,7 +183,7 @@ export function renderDiagram( svgEl, diagram ) {
 
 	// ── Pass 2: nodes ─────────────────────────────────────────────────────────
 	diagram.nodes.forEach( ( node ) => {
-		const colors = NODE_COLORS[ node.type ] || NODE_COLORS.value;
+		const colors = nodeColors( node );
 		const h      = nodeH( node );
 
 		// Drop shadow
@@ -222,9 +222,10 @@ export function renderDiagram( svgEl, diagram ) {
 			} ) );
 		} );
 
-		// ── Type-specific extras ──────────────────────────────────────────────
-		if ( node.type === 'colorRamp' ) renderColorRamp( svgEl, defs, node );
-		if ( node.type === 'mixColor'  ) renderMixColor(  svgEl, node );
+		// ── Subtype-specific extras ───────────────────────────────────────────
+		const sub = nodeSubtype( node );
+		if ( sub === 'colorRamp' ) renderColorRamp( svgEl, defs, node );
+		if ( sub === 'mixColor'  ) renderMixColor(  svgEl, node );
 
 		// ── Input sockets ─────────────────────────────────────────────────────
 		// ── Input sockets ───────────────────────────────────────────

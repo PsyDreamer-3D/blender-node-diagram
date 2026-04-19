@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Build output
+build/
+
+# Package manager
+package-lock.json
+
+# Logs
+npm-debug.log*
+
+# OS files
+.DS_Store

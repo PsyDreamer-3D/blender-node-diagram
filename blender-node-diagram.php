@@ -32,3 +32,6 @@ function blender_node_diagram_register_blocks(): void {
 	register_block_type( __DIR__ . '/concept-block.json' );
 }
 add_action( 'init', 'blender_node_diagram_register_blocks' );
+
+require_once __DIR__ . '/includes/class-template-api.php';
+add_action( 'rest_api_init', [ 'Blender_Node_Diagram_Template_API', 'register_routes' ] );

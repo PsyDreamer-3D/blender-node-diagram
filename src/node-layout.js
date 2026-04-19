@@ -10,6 +10,8 @@
  *   2. Everything else (nodeH, inPos, outPos) adjusts automatically.
  */
 
+import { CATEGORY_COLORS } from './node-categories';
+
 // ─── Canvas constants ─────────────────────────────────────────────────────────
 export const NW  = 142;   // node width (px)
 export const HH  = 22;    // header height
@@ -18,21 +20,37 @@ export const PV  = 8;     // vertical body padding (above + below socket rows)
 export const SK  = 5;     // socket circle radius (normal)
 export const PAD = 20;    // canvas edge clearance
 
-// ─── Node colour palettes ─────────────────────────────────────────────────────
-// Each entry: { h: headerFill, b: bodyFill }
-export const NODE_COLORS = {
-	geometry:   { h: '#2A5555', b: '#162828' },
-	vectorMath: { h: '#253068', b: '#121638' },
-	math:       { h: '#243E24', b: '#101A10' },
-	value:      { h: '#3C3C3C', b: '#1E1E1E' },
-	emission:   { h: '#3E2252', b: '#1A0E24' },
-	output:     { h: '#2E1E1E', b: '#160E0E' },
-	groupIn:    { h: '#3C2E0E', b: '#1E1608' },
-	groupOut:   { h: '#3C2E0E', b: '#1E1608' },
-	// ── New ──
-	colorRamp:  { h: '#3A285A', b: '#1C1028' },  // purple  (Blender: Converter)
-	mixColor:   { h: '#5A3820', b: '#2A1A0C' },  // amber   (Blender: Color)
+// ─── Legacy type → category mapping ──────────────────────────────────────────
+// Allows existing saved diagrams (which use node.type) to resolve colours
+// without any data migration. New nodes use node.category instead.
+export const LEGACY_TYPE_CATEGORY = {
+	geometry:   'input',
+	vectorMath: 'vector',
+	math:       'converter',
+	value:      'input',
+	emission:   'shader',
+	output:     'output',
+	groupIn:    'group',
+	groupOut:   'group',
+	colorRamp:  'converter',
+	mixColor:   'color',
 };
+
+/**
+ * Resolve the header/body fill colours for a node.
+ * Checks (in order): node.category → legacy node.type → input fallback.
+ *
+ * @param {object} node
+ * @returns {{ h: string, b: string }}
+ */
+export function nodeColors( node ) {
+	if ( node.category && CATEGORY_COLORS[ node.category ] ) {
+		return CATEGORY_COLORS[ node.category ];
+	}
+	const cat = LEGACY_TYPE_CATEGORY[ node.type ];
+	if ( cat ) return CATEGORY_COLORS[ cat ];
+	return CATEGORY_COLORS[ node.type ] ?? CATEGORY_COLORS.input;
+}
 
 // ─── Socket / wire colours ────────────────────────────────────────────────────
 export const SOCK_CLR = {
@@ -42,7 +60,7 @@ export const SOCK_CLR = {
 	color:  '#C8A840',
 };
 
-// ─── Extra body height for specialised node types ─────────────────────────────
+// ─── Extra body height for specialised node subtypes ─────────────────────────
 // These pixels are inserted between the header and the first socket row and
 // are used to display the gradient bar (colorRamp) or blend-mode pill (mixColor).
 const NODE_EXTRA_H = {
@@ -50,9 +68,17 @@ const NODE_EXTRA_H = {
 	mixColor:  26,   // 5px pad + 16px blend-mode pill + 5px pad
 };
 
-/** Extra body pixels for this node type (0 if none). */
+/**
+ * Return the effective subtype key for a node.
+ * Checks node.subtype first (new nodes), then falls back to node.type (legacy).
+ */
+export function nodeSubtype( node ) {
+	return node.subtype || node.type;
+}
+
+/** Extra body pixels for this node (0 if none). */
 export function nodeExtraH( node ) {
-	return NODE_EXTRA_H[ node.type ] ?? 0;
+	return NODE_EXTRA_H[ nodeSubtype( node ) ] ?? 0;
 }
 
 /** Total rendered height of a node. */

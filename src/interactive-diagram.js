@@ -17,7 +17,7 @@
 import { useState, useRef, useCallback, useMemo } from '@wordpress/element';
 import {
 	NW, HH, SK, PAD,
-	NODE_COLORS, SOCK_CLR,
+	nodeColors, nodeSubtype, SOCK_CLR,
 	nodeH, nodeExtraH, inPos, outPos,
 	DEFAULT_RAMP_STOPS, rampBarRect,
 	mixPillRect,
@@ -142,7 +142,7 @@ function NodeGroup( {
 	onOutputSocketMouseDown,
 	onInputSocketMouseUp,
 } ) {
-	const colors = NODE_COLORS[ node.type ] ?? NODE_COLORS.value;
+	const colors = nodeColors( node );
 	const h      = nodeH( node );
 
 	const ringColor = isEditing  ? '#E07840'
@@ -194,9 +194,9 @@ function NodeGroup( {
 				);
 			} ) }
 
-			{/* ── Type-specific body elements ─────────────────────────────── */}
-			{ node.type === 'colorRamp' && <ColorRampBody node={ node } /> }
-			{ node.type === 'mixColor'  && <MixColorBody  node={ node } /> }
+			{/* ── Subtype-specific body elements ──────────────────────────── */}
+			{ nodeSubtype( node ) === 'colorRamp' && <ColorRampBody node={ node } /> }
+			{ nodeSubtype( node ) === 'mixColor'  && <MixColorBody  node={ node } /> }
 
 			{/* ── Input sockets ────────────────────────────────────── */}
 			{ node.inputs.map( ( sock, i ) => {
