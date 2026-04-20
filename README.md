@@ -5,9 +5,6 @@ scrollable SVGs. Ships with three Blinn-Phong presets, a full-screen visual
 diagram builder for custom node networks, and a static N/L/V/H concept
 illustration block.
 
-**No build step required to use.** The `build/` folder is included in the zip.
-Just activate and use.
-
 ---
 
 ## Blocks
