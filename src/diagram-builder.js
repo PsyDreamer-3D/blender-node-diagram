@@ -312,6 +312,8 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 	const [ tplSearch,      setTplSearch      ] = useState( '' );
 	const [ tplCategory,    setTplCategory    ] = useState( '' );
 	const [ savingTpl,      setSavingTpl      ] = useState( false );
+	const [ builtinsOpen,   setBuiltinsOpen   ] = useState( true );
+	const [ myTplOpen,      setMyTplOpen      ] = useState( true );
 
 	// Fetch user templates on mount
 	useEffect( () => {
@@ -589,30 +591,48 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 								);
 							}
 
+							const chevron = ( open ) => (
+								<span style={ { fontFamily: 'monospace', fontSize: 9, marginLeft: 'auto', color: '#555' } }>
+									{ open ? '▾' : '▸' }
+								</span>
+							);
+							const sectionHead = ( label, open, toggle, count ) => (
+								<button
+									onClick={ toggle }
+									style={ {
+										display: 'flex', alignItems: 'center', width: '100%',
+										background: 'none', border: 'none', borderBottom: '1px solid #2a2a2a',
+										padding: '4px 0 4px', marginBottom: open ? 6 : 0, cursor: 'pointer',
+										color: '#555', fontSize: 9, fontFamily: 'monospace',
+										textTransform: 'uppercase', letterSpacing: '0.06em',
+									} }
+								>
+									{ label }
+									<span style={ { color: '#333', marginLeft: 4 } }>({ count })</span>
+									{ chevron( open ) }
+								</button>
+							);
+
 							return (
 								<>
 									{ builtins.length > 0 && (
 										<>
-											<p style={ { fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px', fontFamily: 'monospace' } }>
-												{ __( 'Built-in', 'blender-node-diagram' ) }
-											</p>
-											{ builtins.map( ( tpl ) => (
+											{ sectionHead( __( 'Built-in', 'blender-node-diagram' ), builtinsOpen, () => setBuiltinsOpen( ( v ) => ! v ), builtins.length ) }
+											{ builtinsOpen && builtins.map( ( tpl ) => (
 												<TemplateCard key={ tpl.id } tpl={ tpl } onStamp={ addNodeFromTemplate } />
 											) ) }
 										</>
 									) }
 									{ user.length > 0 && (
-										<>
-											<p style={ { fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '8px 0 4px', fontFamily: 'monospace' } }>
-												{ __( 'My Templates', 'blender-node-diagram' ) }
-											</p>
-											{ user.map( ( tpl ) => (
+										<div style={ { marginTop: builtins.length > 0 ? 8 : 0 } }>
+											{ sectionHead( __( 'My Templates', 'blender-node-diagram' ), myTplOpen, () => setMyTplOpen( ( v ) => ! v ), user.length ) }
+											{ myTplOpen && user.map( ( tpl ) => (
 												<TemplateCard key={ tpl.id } tpl={ tpl }
 													onStamp={ addNodeFromTemplate }
 													onDelete={ deleteUserTemplate }
 												/>
 											) ) }
-										</>
+										</div>
 									) }
 								</>
 							);
