@@ -45,7 +45,7 @@ needed. The only editable attribute is the caption text.
 The visual editor opens full-screen as a WordPress Modal.
 
 ```
-┌─ Left panel (380 px) ────────────┬─ Right panel (flex) ──────────────┐
+┌─ Left panel (380 px) ────────────┬─ Right panel (flex) ───────────────┐
 │  NODES  (3)        [Auto-layout] │                                    │
 │  ┌────────────────────────────┐  │   Live dot-grid SVG preview        │
 │  │ geo  (geometry)  [Edit][✕] │  │   Re-renders in real-time as       │
@@ -56,7 +56,7 @@ The visual editor opens full-screen as a WordPress Modal.
 │  └────────────────────────────┘  │                                    │
 │                                  │                                    │
 │  CONNECTIONS  (2)                │                                    │
-│  geo[0] → dot[0]           [✕]  │                                    │
+│  geo[0] → dot[0]           [✕]   │                                    │
 │  ┌─ Add Connection ───────────┐  │                                    │
 │  │  From node  Out #          │  │                                    │
 │  │  To node    In  #   [Add]  │  │                                    │
