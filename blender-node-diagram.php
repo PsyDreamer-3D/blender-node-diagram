@@ -1,17 +1,14 @@
 <?php
 /**
- * Plugin Name:       Blender Node Diagram
- * Plugin URI:        https://github.com/PsyDreamer-3D
- * Description:       Two Gutenberg blocks for rendering Blender shader node diagrams.
- *                    Includes three Blinn-Phong presets, a full-screen visual diagram
- *                    builder for custom node networks, and a static N/L/V/H concept
- *                    illustration block.
- * Version:           {{VERSION}}
+ * Plugin Name: Blender Node Diagram
+ * Plugin URI: https://github.com/PsyDreamer-3D
+ * Description: Two Gutenberg blocks for rendering Blender shader node diagrams. Includes three Blinn-Phong presets, a full-screen visual diagram builder for custom node networks, and a static N/L/V/H concept illustration block.
+ * Version: {{VERSION}}
  * Requires at least: 6.3
- * Requires PHP:      8.0
- * Author:            Jess
- * License:           GPL-2.0-or-later
- * Text Domain:       blender-node-diagram
+ * Requires PHP: 8.0
+ * Author: Jess Green
+ * License: GPL-2.0-or-later
+ * Text Domain: blender-node-diagram
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
