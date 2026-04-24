@@ -6,7 +6,7 @@
  *                    Includes three Blinn-Phong presets, a full-screen visual diagram
  *                    builder for custom node networks, and a static N/L/V/H concept
  *                    illustration block.
- * Version:           1.1.0
+ * Version:           {{VERSION}}
  * Requires at least: 6.3
  * Requires PHP:      8.0
  * Author:            Jess
