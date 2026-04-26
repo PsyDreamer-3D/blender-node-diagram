@@ -14,6 +14,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+define('BLENDER_NODE_DIAGRAM_VERSION', '{{VERSION}}');
 
 /**
  * Register both blocks from their respective block.json files.
@@ -40,7 +41,7 @@ add_action('plugins_loaded', function () {
     }
 
     require_once __DIR__ . '/includes/class-update-checker.php';
-    $bnd_updater = new Blender_Node_Diagram_UpdateChecker( plugin_basename( __FILE__ ), '{{VERSION}}' );
+    $bnd_updater = new Blender_Node_Diagram_UpdateChecker( plugin_basename( __FILE__ ), BLENDER_NODE_DIAGRAM_VERSION );
     $bnd_updater->init();
 });
 
