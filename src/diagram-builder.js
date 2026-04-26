@@ -279,7 +279,7 @@ function TemplateCard( { tpl, onStamp, onDelete } ) {
 					) }
 			</Flex>
 			{ tpl.description && (
-				<p style={ { fontSize: 9, color: "rgb(138, 138, 138)", margin: '3px 0 0', fontFamily: 'monospace' } }>
+				<p style={ { fontSize: 12, color: "#7a7a7a", margin: '3px 0 0', fontFamily: 'monospace' } }>
 					{ tpl.description }
 				</p>
 			) }
@@ -548,11 +548,11 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 										onClick={ () => setTplCategory( active ? '' : value ) }
 										title={ label }
 										style={ {
-											padding: '2px 6px', fontSize: 9,
+											padding: '2px 6px', fontSize: 12,
 											fontFamily: 'monospace', borderRadius: 2,
 											border: active ? `1px solid ${ hColor }` : '1px solid #2a2a2a',
 											background: active ? hColor : '#111',
-											color: active ? '#eee' : '#555',
+											color: active ? '#eee' : '#a3a3a3',
 											cursor: 'pointer', lineHeight: '1.4',
 										} }
 									>
@@ -570,7 +570,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 							style={ {
 								width: '100%', padding: '4px 6px', marginBottom: 8,
 								background: '#111', border: '1px solid #2a2a2a', borderRadius: 3,
-								color: '#ccc', fontSize: 11, fontFamily: 'monospace', boxSizing: 'border-box',
+								color: '#ededed', fontSize: 12, fontFamily: 'monospace', boxSizing: 'border-box',
 							} }
 						/>
 
@@ -585,14 +585,14 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 
 							if ( ! builtins.length && ! user.length ) {
 								return (
-									<p style={ { color: '#444', fontSize: 11, fontStyle: 'italic' } }>
+									<p style={ { color: '#b0b0b0', fontSize: 12, fontStyle: 'italic' } }>
 										{ __( 'No templates match.', 'blender-node-diagram' ) }
 									</p>
 								);
 							}
 
 							const chevron = ( open ) => (
-								<span style={ { fontFamily: 'monospace', fontSize: 9, marginLeft: 'auto', color: '#555' } }>
+								<span style={ { fontFamily: 'monospace', fontSize: 20, marginLeft: 'auto', color: '#a3a3a3' } }>
 									{ open ? '▾' : '▸' }
 								</span>
 							);
@@ -603,12 +603,12 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 										display: 'flex', alignItems: 'center', width: '100%',
 										background: 'none', border: 'none', borderBottom: '1px solid #2a2a2a',
 										padding: '4px 0 4px', marginBottom: open ? 6 : 0, cursor: 'pointer',
-										color: '#555', fontSize: 9, fontFamily: 'monospace',
+										color: '#9a9a9a', fontSize: 12, fontFamily: 'monospace',
 										textTransform: 'uppercase', letterSpacing: '0.06em',
 									} }
 								>
 									{ label }
-									<span style={ { color: '#333', marginLeft: 4 } }>({ count })</span>
+									<span style={ { color: '#878787', marginLeft: 4 } }>({ count })</span>
 									{ chevron( open ) }
 								</button>
 							);
@@ -644,7 +644,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 						<Flex align="center" justify="space-between" style={ { marginBottom: 8 } }>
 							<strong style={ LABEL_STYLE }>
 								{ __( 'Nodes', 'blender-node-diagram' ) }
-								<span style={ { color: '#444', marginLeft: 4 } }>({ nodes.length })</span>
+								<span style={ { color: '#7a7a7a', marginLeft: 4, marginRight: 8 } }>({ nodes.length })</span>
 							</strong>
 							<Flex gap={ 2 }>
 								<Button isSmall variant="secondary" onClick={ handleAutoLayout }
@@ -887,11 +887,11 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 					<section>
 						<strong style={ { ...LABEL_STYLE, display: 'block', marginBottom: 8 } }>
 							{ __( 'Connections', 'blender-node-diagram' ) }
-							<span style={ { color: '#444', marginLeft: 4 } }>({ connections.length })</span>
+							<span style={ { color: '#7a7a7a', marginLeft: 4 } }>({ connections.length })</span>
 						</strong>
 
 						{ connections.length === 0 && (
-							<p style={ { color: '#444', fontSize: 12, fontStyle: 'italic', marginBottom: 8 } }>
+							<p style={ { color: '#7a7a7a', fontSize: 12, fontStyle: 'italic', marginBottom: 8 } }>
 								{ __( 'No connections yet.', 'blender-node-diagram' ) }
 							</p>
 						) }
@@ -972,7 +972,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 				<div style={ {
 					flex: 1, overflow: 'hidden', position: 'relative',
 					background: '#0f0f0f',
-					backgroundImage: 'radial-gradient(circle, #1e1e1e 1px, transparent 1px)',
+					backgroundImage: 'radial-gradient(circle, #515151 1px, transparent 1px)',
 					backgroundSize: '22px 22px',
 				} }>
 					{ previewNodes.length === 0 ? (
@@ -1031,7 +1031,7 @@ export default function DiagramBuilder( { initialData, onApply, onClose } ) {
 				display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
 				gap: 8, background: PANEL_BG, flexShrink: 0,
 			} }>
-				<span style={ { marginRight: 'auto', fontSize: 11, color: '#444', fontFamily: 'monospace' } }>
+				<span style={ { marginRight: 'auto', fontSize: 12, color: '#7a7a7a', fontFamily: 'monospace' } }>
 					{ nodes.length } { __( 'nodes', 'blender-node-diagram' ) }
 					{ ' / ' }
 					{ connections.length } { __( 'connections', 'blender-node-diagram' ) }

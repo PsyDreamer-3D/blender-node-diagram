@@ -20,3 +20,9 @@
 	font-size: 0.75rem;
 	color: #6a6660;
 }
+
+
+/* Or specifically for the heading */
+.bnd-builder-modal .components-modal__header {
+	display: none;
+}
