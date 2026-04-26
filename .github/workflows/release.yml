@@ -6,16 +6,6 @@ on:
       - '*'
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      plugin_slug:
-        description: 'Plugin slug (top-level folder name inside the ZIP)'
-        required: false
-        default: 'blender-node-diagram'
-      plugin_path:
-        description: 'Path to the plugin in the repository (use "." when the repo is the plugin root)'
-        required: false
-        default: '.'
 
 jobs:
   build:
@@ -23,10 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required to upload release assets
-    env:
-      # Use workflow inputs when provided, otherwise fall back to sensible defaults
-      PLUGIN_SLUG: ${{ github.event.inputs.plugin_slug || 'blender-node-diagram' }}
-      PLUGIN_PATH: ${{ github.event.inputs.plugin_path || '.' }}
 
     steps:
       - name: Checkout code
@@ -43,13 +29,12 @@ jobs:
       - name: Build frontend assets
         run: npm run build
 
-      # Explicit plugin configuration so packaged ZIP has the correct folder name
-      - name: Configure plugin package variables
+      - name: Get plugin slug
+        id: slug
         run: |
-          # Export the job-level env variables into GITHUB_ENV so shell steps can use them
-          echo "PLUGIN_SLUG=${PLUGIN_SLUG}" >> $GITHUB_ENV
-          echo "PLUGIN_PATH=${PLUGIN_PATH}" >> $GITHUB_ENV
-          echo "Configured PLUGIN_SLUG=${PLUGIN_SLUG} PLUGIN_PATH=${PLUGIN_PATH}"
+          PLUGIN_SLUG=$(basename $(pwd))
+          echo "slug=${PLUGIN_SLUG}" >> $GITHUB_OUTPUT
+          echo "Plugin slug: ${PLUGIN_SLUG}"
 
       - name: Update version in plugin file
         run: |
@@ -60,34 +45,28 @@ jobs:
           echo "Version: ${VERSION}"
 
           # Use '|' as sed delimiter so slashes in VERSION won't break the substitution
-          PLUGIN_FILE="${PLUGIN_PATH}/${PLUGIN_SLUG}.php"
-          if [ ! -f "$PLUGIN_FILE" ]; then
-            echo "ERROR: plugin file not found at $PLUGIN_FILE"
-            exit 1
-          fi
-          sed -i "s|{{VERSION}}|${VERSION}|g" "$PLUGIN_FILE"
+          sed -i "s|{{VERSION}}|${VERSION}|g" ${PLUGIN_SLUG}.php
 
           # Show the top of the plugin file for debugging
           echo "--- plugin file head ---"
-          sed -n '1,24p' "$PLUGIN_FILE"
+          sed -n '1,15p' ${PLUGIN_SLUG}.php
           echo "------------------------"
 
           # Verify both the plugin header and the constant were updated (fixed-string match)
-          if ! grep -Fq "Version: ${VERSION}" "$PLUGIN_FILE"; then
+          if ! grep -Fq "Version: ${VERSION}" ${PLUGIN_SLUG}.php; then
             echo "ERROR: plugin header Version was not updated to ${VERSION}"
             exit 1
           fi
 
       - name: Create plugin zip
         run: |
-          PLUGIN_SLUG="${PLUGIN_SLUG}"
-          PLUGIN_PATH="${PLUGIN_PATH}"
+          PLUGIN_SLUG="${{ steps.slug.outputs.slug }}"
 
           # Create temporary directory for the plugin
           mkdir -p /tmp/plugin-build/${PLUGIN_SLUG}
 
-          # Copy only the plugin folder into the package directory
-          rsync -av --progress "$PLUGIN_PATH/" /tmp/plugin-build/${PLUGIN_SLUG}/ \
+          # Copy all files
+          rsync -av --progress . /tmp/plugin-build/${PLUGIN_SLUG}/ \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='.circleci' \
@@ -150,35 +129,10 @@ jobs:
           echo "Created ${PLUGIN_SLUG}.zip"
           ls -lh ${GITHUB_WORKSPACE}/${PLUGIN_SLUG}.zip
 
-      - name: Verify ZIP top-level folder matches plugin slug
-        run: |
-          set -euo pipefail
-          ZIP="${GITHUB_WORKSPACE}/${PLUGIN_SLUG}.zip"
-          if [ ! -f "$ZIP" ]; then
-            echo "ERROR: zip not found at $ZIP"
-            exit 1
-          fi
-
-          # Try to get the first entry's top-level folder from the zip
-          TOP=""
-          if command -v zipinfo >/dev/null 2>&1; then
-            TOP=$(zipinfo -1 "$ZIP" | sed -n '1p' | cut -d'/' -f1)
-          else
-            TOP=$(unzip -l "$ZIP" | awk 'NR>3 {print $4; exit}' | sed 's|/.*||')
-          fi
-
-          echo "Top-level entry in zip: $TOP"
-          if [ "$TOP" != "${PLUGIN_SLUG}" ]; then
-            echo "ERROR: zip top-level folder ($TOP) does not match PLUGIN_SLUG (${PLUGIN_SLUG})."
-            echo "You should ensure the zip contains a top-level folder named ${PLUGIN_SLUG}."
-            exit 1
-          fi
-
       - name: Upload release asset
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         with:
-          # Upload the plugin-named zip we created above (use PLUGIN_SLUG so workflow is reusable)
-          files: ${{ env.PLUGIN_SLUG }}.zip
+          files: ${{ steps.slug.outputs.slug }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
