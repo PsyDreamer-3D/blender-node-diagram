@@ -49,7 +49,7 @@ jobs:
 
           # Show the top of the plugin file for debugging
           echo "--- plugin file head ---"
-          sed -n '1,15p' blender-node-diagram.php
+          sed -n '1,24p' blender-node-diagram.php
           echo "------------------------"
 
           # Verify both the plugin header and the constant were updated (fixed-string match)

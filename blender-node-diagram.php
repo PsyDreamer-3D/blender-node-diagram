@@ -32,3 +32,15 @@ add_action( 'init', 'blender_node_diagram_register_blocks' );
 
 require_once __DIR__ . '/includes/class-template-api.php';
 add_action( 'rest_api_init', [ 'Blender_Node_Diagram_Template_API', 'register_routes' ] );
+
+// Instantiate the update checker for GitHub Releases.
+add_action('plugins_loaded', function () {
+    if (!is_admin()) {
+        return;
+    }
+
+    require_once __DIR__ . '/includes/class-update-checker.php';
+    $bnd_updater = new Blender_Node_Diagram_UpdateChecker( plugin_basename( __FILE__ ), '{{VERSION}}' );
+    $bnd_updater->init();
+});
+
