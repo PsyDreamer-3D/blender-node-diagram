@@ -13,9 +13,9 @@ on:
         required: false
         default: 'blender-node-diagram'
       plugin_path:
-        description: 'Path to the plugin in the repository'
+        description: 'Path to the plugin in the repository (use "." when the repo is the plugin root)'
         required: false
-        default: 'wp-content/plugins/blender-node-diagram-dev'
+        default: '.'
 
 jobs:
   build:
@@ -26,7 +26,7 @@ jobs:
     env:
       # Use workflow inputs when provided, otherwise fall back to sensible defaults
       PLUGIN_SLUG: ${{ github.event.inputs.plugin_slug || 'blender-node-diagram' }}
-      PLUGIN_PATH: ${{ github.event.inputs.plugin_path || 'wp-content/plugins/blender-node-diagram-dev' }}
+      PLUGIN_PATH: ${{ github.event.inputs.plugin_path || '.' }}
 
     steps:
       - name: Checkout code
