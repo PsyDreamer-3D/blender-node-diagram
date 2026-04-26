@@ -15,231 +15,257 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+
 class Blender_Node_Diagram_UpdateChecker {
-    /** @var string Plugin basename (e.g. folder/plugin-file.php) */
-    protected string $plugin_basename;
+	/** @var string Plugin basename (e.g. folder/plugin-file.php) */
+	protected string $plugin_basename;
 
-    /** @var string Current installed version */
-    protected string $current_version;
+	/** @var string Current installed version */
+	protected string $current_version;
 
-    // No persistent property for transient; key is computed per-repo.
+	public const GITHUB_API_URL = 'https://api.github.com';
+	public const GITHUB_REPO = 'PsyDreamer-3D/blender-node-diagram';
+	public const GITHUB_REPO_URL = 'https://api.github.com/repos/PsyDreamer-3D/blender-node-diagram';
+	public const GITHUB_RELEASES_URL = 'https://api.github.com/repos/PsyDreamer-3D/blender-node-diagram/releases/latest';
 
-    public function __construct( string $plugin_basename, string $current_version ) {
-        $this->plugin_basename = $plugin_basename;
-        $this->current_version = $current_version;
-    }
+	// Plugin metadata constants.
+	public const PLUGIN_NAME = 'Blender Node Diagram';
+	public const PLUGIN_AUTHOR = 'Jess Green';
 
-    public function init(): void {
-        add_filter( 'site_transient_update_plugins', array( $this, 'check_update' ) );
-        add_filter( 'plugins_api', array( $this, 'plugins_api' ), 10, 3 );
-    }
 
-    /**
-     * Hook: site_transient_update_plugins
-     *
-     * @param object $transient
-     * @return object
-     */
-    public function check_update( $transient ) {
-        // Repo is hard-coded for this plugin.
-        $repo = 'PsyDreamer-3D/blender-node-diagram';
+	// No persistent property for transient; key is computed per-repo.
 
-        // Avoid running when no version is set / placeholder present.
-        if ( ('' === $this->current_version || false !== strpos( $this->current_version, '{{' )) && ! WP_DEBUG ) {
-            return $transient;
-        }
+	public function __construct( string $plugin_basename, string $current_version ) {
+		$this->plugin_basename = $plugin_basename;
+		$this->current_version = $current_version;
+	}
 
-        $release = $this->get_latest_release( $repo );
+	/**
+	 * Derive the plugin slug from the plugin basename.
+	 *
+	 * @return string
+	 */
+	protected function get_slug(): string {
+		return basename( $this->plugin_basename, '.php' );
+	}
 
-        if ( ! is_array( $release ) || empty( $release['tag_name'] ) ) {
-            return $transient;
-        }
+	public function init(): void {
+		add_filter( 'site_transient_update_plugins', array( $this, 'check_update' ) );
+		add_filter( 'plugins_api', array( $this, 'plugins_api' ), 10, 3 );
+	}
 
-        $remote_version = ltrim( (string) $release['tag_name'], "vV" );
+	/**
+	 * Hook: site_transient_update_plugins
+	 *
+	 * @param object $transient
+	 * @return object
+	 */
+	public function check_update( $transient ) {
+		// Allow the check to run during development when WP_DEBUG=true even if
+		// the version placeholder is present.
+		// Avoid running when no version is set / placeholder present.
+		if ( ('' === $this->current_version || false !== strpos( $this->current_version, '{{' )) && ! WP_DEBUG ) {
+			return $transient;
+		}
 
-        if ( version_compare( $remote_version, $this->current_version, '>' ) ) {
-            // Prefer a release asset that matches the plugin slug (e.g. "slug.zip")
-            // so the extracted folder name matches the plugin directory. Fall
-            // back to GitHub's zipball URL if no suitable asset exists.
-            $slug = dirname( $this->plugin_basename );
-            $package = '';
-            if ( ! empty( $release['assets'] ) && is_array( $release['assets'] ) ) {
-                foreach ( $release['assets'] as $asset ) {
-                    $name = $asset['name'] ?? '';
-                    $url = $asset['browser_download_url'] ?? '';
-                    if ( '' === $name || '' === $url ) {
-                        continue;
-                    }
+		$release = $this->get_latest_release();
 
-                    // Exact match: "slug.zip"
-                    if ( 0 === strcasecmp( $name, $slug . '.zip' ) ) {
-                        $package = $url;
-                        break;
-                    }
+		if ( ! is_array( $release ) || empty( $release['tag_name'] ) ) {
+			return $transient;
+		}
 
-                    // Partial match: contains slug and is a zip (e.g. "blender-node-diagram-v1.2.3.zip").
-                    if ( false !== stripos( $name, $slug ) && strtolower( substr( $name, -4 ) ) === '.zip' ) {
-                        $package = $url;
-                        break;
-                    }
-                }
-            }
+		$remote_version = ltrim( (string) $release['tag_name'], "vV" );
 
-            if ( '' === $package ) {
-                $package = $release['zipball_url'] ?? '';
-            }
+		if ( version_compare( $remote_version, $this->current_version, '>' ) ) {
+			// Prefer a release asset that matches the plugin slug (e.g. "slug.zip")
+			// so the extracted folder name matches the plugin directory. Fall
+			// back to GitHub's zipball URL if no suitable asset exists.
+			$slug = $this->get_slug();
+			$package = $this->find_release_asset_url( $release );
 
-            $update = new \stdClass();
-            $update->slug = dirname( $this->plugin_basename );
-            $update->new_version = $remote_version;
-            $update->url = $release['html_url'] ?? 'https://github.com';
-            $update->package = $package;
+			if ( '' === $package ) {
+				// No suitable release asset found for the plugin; do not offer an
+				// update that uses the repo zipball. The release should include
+				// a distributable asset (e.g. "slug.zip"). Hard-fail by
+				// returning the transient unchanged.
+				return $transient;
+			}
 
-            if ( ! is_object( $transient ) ) {
-                return $transient;
-            }
+			$update = new \stdClass();
+			$update->slug = $this->get_slug();
+			$update->new_version = $remote_version;
+			$update->url = $release['html_url'] ?? 'https://github.com';
+			$update->package = $package;
 
-            $transient->response[ $this->plugin_basename ] = $update;
-        }
+			if ( ! is_object( $transient ) ) {
+				return $transient;
+			}
 
-        return $transient;
-    }
+			$transient->response[ $this->plugin_basename ] = $update;
+		}
 
-    /**
-     * Provide plugin information to the details modal (Plugins > Details).
-     *
-     * @param false|object|array $res
-     * @param string $action
-     * @param object $args
-     * @return object|false
-     */
-    public function plugins_api( $res, $action, $args ) {
-        if ( 'plugin_information' !== $action ) {
-            return $res;
-        }
+		return $transient;
+	}
 
-        $slug = dirname( $this->plugin_basename );
+	/**
+	 * Provide plugin information to the details modal (Plugins > Details).
+	 *
+	 * @param false|object|array $res
+	 * @param string $action
+	 * @param object $args
+	 * @return object|false
+	 */
+	public function plugins_api( $res, $action, $args ) {
+		if ( 'plugin_information' !== $action ) {
+			return $res;
+		}
 
-        if ( empty( $args->slug ) || $args->slug !== $slug ) {
-            return $res;
-        }
+		$slug = $this->get_slug();
 
-        // Repo is hard-coded for this plugin.
-        $repo = 'PsyDreamer-3D/blender-node-diagram';
-        $release = $this->get_latest_release( $repo );
-        if ( ! is_array( $release ) ) {
-            return $res;
-        }
+		if ( empty( $args->slug ) || $args->slug !== $slug ) {
+			return $res;
+		}
 
-        $remote_version = ltrim( (string) ( $release['tag_name'] ?? '' ), "vV" );
+		$repo = self::GITHUB_REPO;
+		if ( '' === $repo ) {
+			return $res;
+		}
 
-        $info = new \stdClass();
-        $info->name = 'Blender Node Diagram';
-        $info->slug = $slug;
-        $info->version = $remote_version ?: $this->current_version;
-        $info->author = 'Jess Green';
-        $info->homepage = $release['html_url'] ?? 'https://github.com';
+		$release = $this->get_latest_release( $repo );
+		if ( ! is_array( $release ) ) {
+			return $res;
+		}
 
-        // Prefer a release asset zip matching the plugin slug for proper
-        // installation folder naming. Fall back to the repo zipball URL.
-        $slug = dirname( $this->plugin_basename );
-        $download_link = '';
-        if ( ! empty( $release['assets'] ) && is_array( $release['assets'] ) ) {
-            foreach ( $release['assets'] as $asset ) {
-                $name = $asset['name'] ?? '';
-                $url = $asset['browser_download_url'] ?? '';
-                if ( '' === $name || '' === $url ) {
-                    continue;
-                }
+		$remote_version = ltrim( (string) ( $release['tag_name'] ?? '' ), "vV" );
 
-                if ( 0 === strcasecmp( $name, $slug . '.zip' ) ) {
-                    $download_link = $url;
-                    break;
-                }
+		$info = new \stdClass();
+		$info->name = self::PLUGIN_NAME;
+		$info->slug = $slug;
+		$info->version = $remote_version ?: $this->current_version;
+		$info->author = self::PLUGIN_AUTHOR;
+		$info->homepage = $release['html_url'] ?? 'https://github.com';
 
-                if ( false !== stripos( $name, $slug ) && strtolower( substr( $name, -4 ) ) === '.zip' ) {
-                    $download_link = $url;
-                    break;
-                }
-            }
-        }
+		// Prefer a release asset zip matching the plugin slug for proper
+		// installation folder naming. Fall back to the repo zipball URL.
+		$download_link = $this->find_release_asset_url( $release );
 
-        if ( '' === $download_link ) {
-            $download_link = $release['zipball_url'] ?? '';
-        }
+		if ( '' === $download_link ) {
+			// No distributable asset present; do not provide plugin download
+			// information. Require a release asset rather than falling back to
+			// the repo zipball.
+			return $res;
+		}
 
-        $info->download_link = $download_link;
+		$info->download_link = $download_link;
 
-        $sections = array();
-        $sections['description'] = 'Syncs Site Editor templates and global styles into theme files.';
-        if ( ! empty( $release['body'] ) ) {
-            $sections['changelog'] = nl2br( $this->escape_html( $release['body'] ) );
-        }
+		$sections = array();
+		$sections['description'] = 'Syncs Site Editor templates and global styles into theme files.';
+		if ( ! empty( $release['body'] ) ) {
+			$sections['changelog'] = nl2br( $this->escape_html( $release['body'] ) );
+		}
 
-        $info->sections = $sections;
+		$info->sections = $sections;
 
-        return $info;
-    }
+		return $info;
+	}
 
-    /**
-     * Fetch the latest GitHub release for a repo (owner/repo). Uses a transient
-     * to cache results for 5 minutes.
-     *
-     * @param string $repo
-     * @return array|null
-     */
-    protected function get_latest_release( string $repo ): ?array {
-        $transient_key = 'bnd_github_release_' . md5( $repo );
-        $cached = get_transient( $transient_key );
-        if ( is_array( $cached ) ) {
-            return $cached;
-        }
+	/**
+	 * Find the download URL for a release asset that matches the plugin slug.
+	 *
+	 * Checks for an exact match ("slug.zip") first, then falls back to any
+	 * asset whose name contains the slug and ends in ".zip". Returns an empty
+	 * string when no suitable asset is found.
+	 *
+	 * @param array $release Decoded GitHub release array.
+	 * @return string Asset download URL, or '' if none found.
+	 */
+	protected function find_release_asset_url( array $release ): string {
+		if ( empty( $release['assets'] ) || ! is_array( $release['assets'] ) ) {
+			return '';
+		}
 
-        $url = 'https://api.github.com/repos/' . $repo . '/releases/latest';
+		$slug = $this->get_slug();
 
-        $args = array(
-            'timeout' => 15,
-            'headers' => array(
-                'Accept' => 'application/vnd.github.v3+json',
-                'User-Agent' => 'Blender-Node-Diagram-Updater',
-            ),
-        );
+		foreach ( $release['assets'] as $asset ) {
+			$name = $asset['name'] ?? '';
+			$url  = $asset['browser_download_url'] ?? '';
 
-        $resp = wp_remote_get( $url, $args );
-        if ( is_wp_error( $resp ) ) {
-            return null;
-        }
+			if ( '' === $name || '' === $url ) {
+				continue;
+			}
 
-        $code = wp_remote_retrieve_response_code( $resp );
-        $body = wp_remote_retrieve_body( $resp );
+			// Exact match: "slug.zip"
+			if ( 0 === strcasecmp( $name, $slug . '.zip' ) ) {
+				return $url;
+			}
 
-        if ( 200 !== (int) $code || '' === $body ) {
-            return null;
-        }
+			// Partial match: contains slug and is a zip (e.g. "plugin-v1.2.3.zip").
+			if ( false !== stripos( $name, $slug ) && strtolower( substr( $name, -4 ) ) === '.zip' ) {
+				return $url;
+			}
+		}
 
-        $decoded = json_decode( $body, true );
-        if ( ! is_array( $decoded ) ) {
-            return null;
-        }
+		return '';
+	}
 
-        // Cache for 6 hours to avoid rate limits.
-        set_transient( $transient_key, $decoded, MINUTE_IN_SECONDS * 360 );
+	/**
+	 * Fetch the latest GitHub release for a repo (owner/repo). Uses a transient
+	 * to cache results for 6 hours.
+	 *
+	 * @param string|null $repo Owner/repo string (optional). Defaults to class constant.
+	 * @return array|null
+	 */
+	protected function get_latest_release( ?string $repo = null ): ?array {
+		$repo = $repo ?: self::GITHUB_REPO;
+		$transient_key = 'wbts_github_release_' . md5( $repo );
+		$cached = get_transient( $transient_key );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
 
-        return $decoded;
-    }
+		$args = array(
+			'timeout' => 15,
+			'headers' => array(
+				'Accept' => 'application/vnd.github.v3+json',
+				'User-Agent' => 'WP-Block-Template-Sync-Updater',
+			),
+		);
 
-    /**
-     * Escape a string for HTML output. Prefer WP's esc_html when available,
-     * otherwise fall back to PHP's htmlspecialchars.
-     *
-     * @param string $text
-     * @return string
-     */
-    protected function escape_html( string $text ): string {
-        if ( function_exists( 'esc_html' ) ) {
-            return esc_html( $text );
-        }
+		$resp = wp_remote_get( self::GITHUB_RELEASES_URL, $args );
+		if ( is_wp_error( $resp ) ) {
+			return null;
+		}
 
-        return htmlspecialchars( $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
-    }
+		$code = wp_remote_retrieve_response_code( $resp );
+		$body = wp_remote_retrieve_body( $resp );
+
+		if ( 200 !== (int) $code || '' === $body ) {
+			return null;
+		}
+
+		$decoded = json_decode( $body, true );
+		if ( ! is_array( $decoded ) ) {
+			return null;
+		}
+
+		// Cache for 6 hours to avoid rate limits.
+		set_transient( $transient_key, $decoded, MINUTE_IN_SECONDS * 360 );
+
+		return $decoded;
+	}
+
+	/**
+	 * Escape a string for HTML output. Prefer WP's esc_html when available,
+	 * otherwise fall back to PHP's htmlspecialchars.
+	 *
+	 * @param string $text
+	 * @return string
+	 */
+	protected function escape_html( string $text ): string {
+		if ( function_exists( 'esc_html' ) ) {
+			return esc_html( $text );
+		}
+
+		return htmlspecialchars( $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+	}
 }
