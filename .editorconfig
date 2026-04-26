@@ -1,0 +1,45 @@
+# WordPress Coding Standards — EditorConfig
+# https://editorconfig.org
+# https://developer.wordpress.org/coding-standards/
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# PHP, JS, CSS, SCSS — tabs (WordPress standard)
+[*.{php,js,jsx,ts,tsx,css,scss,sass}]
+indent_style = tab
+indent_size = 4
+
+# JSON & config files — 2-space indent
+[*.{json,json5}]
+indent_style = space
+indent_size = 2
+
+# YAML (GitHub Actions, etc.) — 2-space indent
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# HTML / template files — tabs
+[*.{html,htm}]
+indent_style = tab
+indent_size = 4
+
+# Markdown — preserve trailing whitespace (two spaces = line break)
+[*.{md,mdx}]
+trim_trailing_whitespace = false
+
+# Shell scripts — tabs
+[*.sh]
+indent_style = tab
+indent_size = 4
+
+# Makefiles require tabs
+[Makefile]
+indent_style = tab
+

@@ -65,59 +65,9 @@ jobs:
           # Create temporary directory for the plugin
           mkdir -p /tmp/plugin-build/${PLUGIN_SLUG}
 
-          # Copy all files
+          # Copy all files, excluding patterns listed in .distignore
           rsync -av --progress . /tmp/plugin-build/${PLUGIN_SLUG}/ \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='.circleci' \
-            --exclude='.babelrc' \
-            --exclude='.deployignore' \
-            --exclude='.distignore' \
-            --exclude='.editorconfig' \
-            --exclude='.eslintignore' \
-            --exclude='.eslintrc' \
-            --exclude='.gitignore' \
-            --exclude='.gitlab-ci.yml' \
-            --exclude='.travis.yml' \
-            --exclude='.DS_Store' \
-            --exclude='.*~' \
-            --exclude='Thumbs.db' \
-            --exclude='behat.yml' \
-            --exclude='bitbucket-pipelines.yml' \
-            --exclude='bin' \
-            --exclude='composer.json' \
-            --exclude='composer.lock' \
-            --exclude='dependencies.yml' \
-            --exclude='Gruntfile.js' \
-            --exclude='package.json' \
-            --exclude='package-lock.json' \
-            --exclude='phpunit.xml' \
-            --exclude='phpunit.xml.dist' \
-            --exclude='multisite.xml' \
-            --exclude='multisite.xml.dist' \
-            --exclude='.phpcs.xml' \
-            --exclude='phpcs.xml' \
-            --exclude='.phpcs.xml.dist' \
-            --exclude='phpcs.xml.dist' \
-            --exclude='phpcs.dist.xml' \
-            --exclude='build.xml' \
-            --exclude='README.md' \
-            --exclude='webpack.config.js' \
-            --exclude='wp-cli.local.yml' \
-            --exclude='yarn.lock' \
-            --exclude='tests' \
-            --exclude='node_modules' \
-            --exclude='*.sql' \
-            --exclude='*.tar.gz' \
-            --exclude='*.zip' \
-            --exclude='manifest.json' \
-            --exclude='vendor' \
-            --exclude='.idea' \
-            --exclude='.vscode' \
-            --exclude='AGENTS.md' \
-            --exclude='.phpunit.result.cache' \
-            --exclude='.nvmrc' \
-            --exclude='.claude'
+            --exclude-from='.distignore'
 
           # Create zip file
           cd /tmp/plugin-build
