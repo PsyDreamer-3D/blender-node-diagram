@@ -45,15 +45,15 @@ jobs:
           echo "Version: ${VERSION}"
 
           # Use '|' as sed delimiter so slashes in VERSION won't break the substitution
-          sed -i "s|{{VERSION}}|${VERSION}|g" ${PLUGIN_SLUG}.php
+          sed -i "s|{{VERSION}}|${VERSION}|g" ${{steps.slug.outputs.slug}}.php
 
           # Show the top of the plugin file for debugging
           echo "--- plugin file head ---"
-          sed -n '1,15p' ${PLUGIN_SLUG}.php
+          sed -n '1,15p' ${{steps.slug.outputs.slug}}.php
           echo "------------------------"
 
           # Verify both the plugin header and the constant were updated (fixed-string match)
-          if ! grep -Fq "Version: ${VERSION}" ${PLUGIN_SLUG}.php; then
+          if ! grep -Fq "Version: ${VERSION}" ${{steps.slug.outputs.slug}}.php; then
             echo "ERROR: plugin header Version was not updated to ${VERSION}"
             exit 1
           fi
